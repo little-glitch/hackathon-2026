@@ -24,17 +24,27 @@ export async function generateFullTripItineraryWithAI(payload) {
     transport = 'Public Transport',
     foodPreferences = ['Local Cuisine'],
     notes = ''
-  } = payload;
+  } = payload || {};
 
   const startLoc = (startingLocation || 'Starting Point').trim();
   const destLoc = (destination || 'Destination Point').trim();
 
-  console.log('[HALO AI Full Trip Planner] Generating full itinerary for:', {
+  console.log('[HALO AI Trip Planner] 1. Request Payload Received:', {
     startLoc,
     destLoc,
+    departureDate,
+    returnDate,
     numberOfDays,
+    numberOfTravelers,
+    tripType,
     budgetType,
-    currency
+    currency,
+    budgetAmount,
+    selectedPreferences,
+    accommodation,
+    transport,
+    foodPreferences,
+    notes
   });
 
   const prompt = `
@@ -94,7 +104,7 @@ Respond ONLY in valid JSON matching this schema:
       "evening": {
         "activity": "Sunset Point & Local Promenade",
         "time": "05:30 PM - 08:00 PM",
-        "cost": "${currency} 300",
+        "cost": "${currency} 250",
         "description": "Relax at scenic viewpoint with evening refreshments."
       },
       "night": {
@@ -159,8 +169,11 @@ Respond ONLY in valid JSON matching this schema:
 }
 `;
 
+  console.log('[HALO AI Trip Planner] 2. Full Gemini Request Prompt:', prompt);
+
   if (GEMINI_API_KEY) {
     try {
+      console.log('[HALO AI Trip Planner] 3. Calling Gemini API Endpoint...');
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -172,20 +185,29 @@ Respond ONLY in valid JSON matching this schema:
         }
       );
 
+      console.log('[HALO AI Trip Planner] 4. Gemini Response Status:', response.status);
       const data = await response.json();
+      console.log('[HALO AI Trip Planner] 5. Full Gemini API Raw Response:', data);
+
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      console.log('[HALO AI Trip Planner] 6. Raw Gemini Text:', text);
 
       if (text) {
         const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanText);
+        const parsed = JSON.parse(cleanText);
+        console.log('[HALO AI Trip Planner] 7. Validated JSON Parsed Output:', parsed);
+        return parsed;
       }
     } catch (err) {
-      console.warn('[HALO AI Full Trip Planner] Gemini API failed, using rich local fallback engine:', err);
+      console.warn('[HALO AI Trip Planner] Gemini API call/parse failed, switching to dynamic local reasoning engine:', err);
     }
   }
 
   // Dynamic Rich Fallback Itinerary Generator Engine
-  return fallbackFullTripItineraryReasoning(payload);
+  console.log('[HALO AI Trip Planner] 3 (Fallback). Executing Dynamic Local Itinerary Engine...');
+  const fallbackResult = fallbackFullTripItineraryReasoning(payload);
+  console.log('[HALO AI Trip Planner] 7 (Fallback). Validated Fallback Output:', fallbackResult);
+  return fallbackResult;
 }
 
 /**
@@ -208,7 +230,7 @@ function fallbackFullTripItineraryReasoning(payload) {
     transport = 'Public Transport',
     foodPreferences = ['Local Cuisine'],
     notes = ''
-  } = payload;
+  } = payload || {};
 
   const startLoc = (startingLocation || 'Starting Point').trim();
   const destLoc = (destination || 'Destination Point').trim();
@@ -344,7 +366,7 @@ function fallbackFullTripItineraryReasoning(payload) {
       'Government ID, transit passes & emergency contact card'
     ],
     safetyAdvice: [
-      `Keep phone battery charged above 50% for continuous HALO GPS corridor sync in ${destName || destLoc}.`,
+      `Keep phone battery charged above 50% for continuous HALO GPS corridor sync in ${destLoc}.`,
       `Prefer lit primary avenues over unmonitored shortcuts after 09:00 PM.`,
       `Share your live HALO location link with your primary emergency contact.`,
       `Verify driver credentials and license plate when using rideshare or taxi.`

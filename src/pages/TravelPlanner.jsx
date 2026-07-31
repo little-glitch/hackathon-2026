@@ -122,12 +122,12 @@ export default function TravelPlanner() {
     setCheckedPacking(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
-  // Form Submission & Full Itinerary AI Generation
+  // Form Submission & Full Itinerary AI Generation with Robust try...catch...finally
   const handleSubmitTripForm = async (e) => {
     e.preventDefault();
     setValidationError('');
 
-    if (!formData.startingLocation.trim() || !formData.destination.trim()) {
+    if (!formData.startingLocation || !formData.startingLocation.trim() || !formData.destination || !formData.destination.trim()) {
       setValidationError('Please specify both Starting Location and Destination.');
       return;
     }
@@ -142,14 +142,26 @@ export default function TravelPlanner() {
       return;
     }
 
+    console.log('[HALO AI Travel Planner] Form submitted, initiating AI itinerary generation...');
     setFullItinerary(null);
     setIsGenerating(true);
 
-    const res = await generateFullTripItineraryWithAI(formData);
-
-    setIsGenerating(false);
-    setFullItinerary(res);
-    setActiveDayTab(1);
+    try {
+      const res = await generateFullTripItineraryWithAI(formData);
+      if (res) {
+        setFullItinerary(res);
+        setActiveDayTab(1);
+      } else {
+        setValidationError('Received empty response from AI planner. Please try again.');
+      }
+    } catch (err) {
+      console.error('[HALO AI Travel Planner] Error during itinerary generation:', err);
+      setValidationError('An error occurred while generating your travel itinerary. Please try again.');
+    } finally {
+      // REQUIREMENT 8: Ensure loading state is ALWAYS cleared
+      console.log('[HALO AI Travel Planner] Clearing loading state in finally block.');
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -247,7 +259,7 @@ export default function TravelPlanner() {
             <button
               type="submit"
               disabled={isGenerating}
-              className="btn-dark-green w-full py-5 text-sm font-extrabold tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl hover:scale-[1.005] transition-all"
+              className="btn-dark-green w-full py-5 text-sm font-extrabold tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl hover:scale-[1.005] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
                 <>
