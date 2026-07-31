@@ -22,9 +22,12 @@ import JourneyStatusCard from '../components/live-journey/JourneyStatusCard';
 import JourneyControls from '../components/live-journey/JourneyControls';
 import AIJourneyMonitor from '../components/live-journey/AIJourneyMonitor';
 import JourneyRecorder from '../components/live-journey/JourneyRecorder';
+import JourneySummary from '../components/live-journey/JourneySummary';
+import { journeyMemory } from '../services/JourneyMemory';
+import { generateJourneySummaryWithAI } from '../services/aiService';
 
 export default function LiveJourney() {
-  // Journey State: 'Idle' | 'Active' | 'Paused'
+  // Journey State: 'Idle' | 'Active' | 'Paused' | 'Ended'
   const [journeyState, setJourneyState] = useState('Idle');
   
   // Destination State (Selected via Map Click or Form Input)
@@ -38,6 +41,10 @@ export default function LiveJourney() {
   const [initialDistance, setInitialDistance] = useState(0);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [estimatedTime, setEstimatedTime] = useState(null);
+
+  // End of Journey AI Summary State
+  const [summaryData, setSummaryData] = useState(null);
+  const [summaryStats, setSummaryStats] = useState({ observationCount: 0, deviationCount: 0 });
 
   const emergencyActions = [
     {
@@ -89,6 +96,7 @@ export default function LiveJourney() {
 
   const handleStartJourney = (currentLocation) => {
     setJourneyState('Active');
+    setSummaryData(null);
     if (currentLocation && destination) {
       const dist = calculateHaversineDistance(
         currentLocation.lat,
@@ -104,8 +112,22 @@ export default function LiveJourney() {
     setJourneyState('Paused');
   };
 
-  const handleEndJourney = () => {
-    setJourneyState('Idle');
+  const handleEndJourney = async () => {
+    setJourneyState('Ended');
+    journeyMemory.endSession();
+
+    const stats = journeyMemory.getStats();
+    const memoryEvents = journeyMemory.getMemory();
+    setSummaryStats(stats);
+
+    // Call Gemini AI to generate trip summary report
+    const aiSummary = await generateJourneySummaryWithAI({
+      destinationName: destination?.name || 'Destination',
+      stats,
+      memoryEvents
+    });
+
+    setSummaryData(aiSummary);
   };
 
   const handleSelectDestination = (newDest) => {
@@ -146,7 +168,7 @@ export default function LiveJourney() {
                 
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
                   <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
-                  <span>Proactive AI Route Companion</span>
+                  <span>Predictive AI Route Companion</span>
                 </div>
 
                 <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -154,7 +176,7 @@ export default function LiveJourney() {
                 </h1>
 
                 <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
-                  Monitor your trip in real time and stay informed with proactive AI safety updates throughout your journey.
+                  Monitor your trip in real time and stay informed with proactive predictive safety updates throughout your journey.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
@@ -180,12 +202,25 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 2: Journey Controls & Telemetry Status */}
+            {/* SECTION 2: End-of-Journey AI Summary Report Card (Appears when Ended) */}
+            {journeyState === 'Ended' && (
+              <section className="w-full">
+                <JourneySummary
+                  destinationName={destination?.name}
+                  summaryData={summaryData}
+                  stats={summaryStats}
+                  onClose={() => setJourneyState('Idle')}
+                />
+              </section>
+            )}
+
+
+            {/* SECTION 3: Journey Controls & Telemetry Status */}
             <section id="journey-controls" className="flex flex-col gap-8 scroll-mt-24">
               
               {/* Journey Controls Panel */}
               <JourneyControls
-                journeyState={journeyState}
+                journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
                 onStartJourney={() => handleStartJourney(currentLocation)}
                 onPauseJourney={handlePauseJourney}
                 onEndJourney={handleEndJourney}
@@ -205,10 +240,10 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 3: AI Monitoring Engine (Companion, Alerts & Observations Timeline) */}
+            {/* SECTION 4: Predictive Safety Intelligence Engine */}
             <section className="w-full">
               <AIJourneyMonitor
-                journeyState={journeyState}
+                journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
                 currentLocation={currentLocation}
                 destination={destination}
                 routeCoordinates={routeCoordinates}
@@ -220,14 +255,14 @@ export default function LiveJourney() {
 
             {/* Telemetry Recorder Log Container */}
             <JourneyRecorder
-              journeyState={journeyState}
+              journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
               currentLocation={currentLocation}
               distanceRemaining={distanceRemaining}
               progressPercentage={progressPercentage}
             />
 
 
-            {/* SECTION 4: Interactive Leaflet Map */}
+            {/* SECTION 5: Interactive Leaflet Map */}
             <section className="editorial-white-card p-8 sm:p-12 flex flex-col gap-6">
               <div className="flex flex-col gap-1 border-b border-black/5 pb-6">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
@@ -252,7 +287,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 5: Emergency Quick Actions */}
+            {/* SECTION 6: Emergency Quick Actions */}
             <section id="quick-actions" className="flex flex-col gap-6">
               <div className="flex flex-col gap-2">
                 <div className="inline-flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
@@ -311,7 +346,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 6: Journey Insights */}
+            {/* SECTION 7: Journey Insights */}
             <section className="editorial-white-card p-8 sm:p-12">
               <div className="flex flex-col gap-8">
                 <div className="flex flex-col gap-1 border-b border-black/5 pb-6">
@@ -380,7 +415,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 7: Bottom CTA */}
+            {/* SECTION 8: Bottom CTA */}
             <section className="reference-hero-container p-10 sm:p-14 text-center flex flex-col items-center justify-center gap-5">
               <div className="w-14 h-14 rounded-full bg-white/20 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-md">
                 <Navigation className="w-7 h-7" />

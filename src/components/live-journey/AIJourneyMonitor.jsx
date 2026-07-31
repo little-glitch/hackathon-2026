@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { analyzeJourneyWithAI } from '../../services/aiService';
+import { journeyMemory } from '../../services/JourneyMemory';
 import CompanionCard from './CompanionCard';
+import RiskAssessment from './RiskAssessment';
+import RecommendationFeed from './RecommendationFeed';
 import AlertManager from './AlertManager';
 import JourneyTimeline from './JourneyTimeline';
 import { calculateHaversineDistance } from './JourneyTracker';
@@ -14,6 +17,11 @@ export default function AIJourneyMonitor({
   progressPercentage = 0 
 }) {
   const [companionMessage, setCompanionMessage] = useState('HALO AI Companion active and monitoring your safe corridor.');
+  const [riskLevel, setRiskLevel] = useState('Low');
+  const [confidence, setConfidence] = useState(94);
+  const [riskExplanation, setRiskExplanation] = useState('Current journey risk is LOW because you are following the planned route through monitored areas.');
+  const [recommendations, setRecommendations] = useState([]);
+  
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [alerts, setAlerts] = useState([]);
@@ -21,10 +29,15 @@ export default function AIJourneyMonitor({
 
   // Ref to track stationary duration
   const stationaryStartTimeRef = useRef(null);
+  const journeyDurationStartRef = useRef(null);
 
-  // Helper to add event to timeline (newest at top)
+  // Helper to add event to timeline & memory (newest at top)
   const logEvent = (type, description, level = 'Information') => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    // Save to journey memory service
+    journeyMemory.recordEvent(type, description, level);
+
     setEvents(prev => [
       {
         id: `evt-${Date.now()}-${Math.random()}`,
@@ -55,7 +68,6 @@ export default function AIJourneyMonitor({
     if (!userLoc || !coords || coords.length === 0) return 0;
     let minDistanceKm = Infinity;
     
-    // Check distance to all route nodes
     coords.forEach(pt => {
       const d = calculateHaversineDistance(userLoc.lat, userLoc.lng, pt[0], pt[1]);
       if (d < minDistanceKm) minDistanceKm = d;
@@ -64,9 +76,11 @@ export default function AIJourneyMonitor({
     return minDistanceKm * 1000; // convert to meters
   };
 
-  // Trigger initial timeline event when Journey starts
+  // Handle session initialization
   useEffect(() => {
     if (journeyState === 'Active') {
+      journeyMemory.startSession();
+      journeyDurationStartRef.current = Date.now();
       logEvent('Journey Started', `Live monitoring initialized towards ${destination?.name || 'Target Pin'}.`, 'Information');
     } else if (journeyState === 'Paused') {
       logEvent('Journey Paused', 'Route monitoring paused by user.', 'Information');
@@ -82,6 +96,9 @@ export default function AIJourneyMonitor({
       setIsAnalyzing(true);
 
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const durationMins = journeyDurationStartRef.current 
+        ? Math.floor((Date.now() - journeyDurationStartRef.current) / (1000 * 60))
+        : 0;
 
       // 1. Off-Route Check
       const offRouteDist = calculateOffRouteDistance(currentLocation, routeCoordinates);
@@ -102,13 +119,15 @@ export default function AIJourneyMonitor({
         : 0;
       const isStationary = stationaryDurationMins >= 3;
 
-      // 3. Call Gemini AI / Safety Reasoning Service
+      // 3. Call Gemini AI / Predictive Safety Reasoning Service
       const aiResult = await analyzeJourneyWithAI({
         currentLocation,
         destination,
         speed: currentLocation.speed,
         distanceRemaining,
         progressPercentage,
+        timeOfDay: timestamp,
+        durationMins,
         isOffRoute,
         offRouteDistance: offRouteDist,
         isStationary,
@@ -123,7 +142,32 @@ export default function AIJourneyMonitor({
           setCompanionMessage(aiResult.companionMessage);
         }
 
-        // Log AI Check in Timeline
+        if (aiResult.riskLevel) {
+          setRiskLevel(aiResult.riskLevel);
+        }
+
+        if (aiResult.confidence) {
+          setConfidence(aiResult.confidence);
+        }
+
+        if (aiResult.riskExplanation) {
+          setRiskExplanation(aiResult.riskExplanation);
+        }
+
+        // Feature 4: Append new predictive recommendations with confidence %
+        if (aiResult.recommendations && aiResult.recommendations.length > 0) {
+          const newRecs = aiResult.recommendations.map(r => ({
+            id: `rec-${Date.now()}-${Math.random()}`,
+            timestamp,
+            text: r.text,
+            priority: r.priority || 'Low',
+            confidence: r.confidence || (aiResult.confidence - 2)
+          }));
+
+          setRecommendations(prev => [...newRecs, ...prev].slice(0, 10)); // keep last 10
+        }
+
+        // Log AI Check in Timeline & Memory
         logEvent('AI Check Completed', aiResult.companionMessage, aiResult.alertLevel || 'Information');
 
         // Handle Off-Route Alert
@@ -188,6 +232,16 @@ export default function AIJourneyMonitor({
         isAnalyzing={isAnalyzing}
         lastUpdated={lastUpdated}
       />
+
+      {/* Feature 1 & 5: AI Risk Assessment Card (Low/Moderate/High & Confidence %) */}
+      <RiskAssessment
+        riskLevel={riskLevel}
+        confidence={confidence}
+        riskExplanation={riskExplanation}
+      />
+
+      {/* Feature 3 & 4: Predictive AI Recommendation Feed */}
+      <RecommendationFeed recommendations={recommendations} />
 
       {/* Feature 2, 4, 6: Alert Manager (Deviation, Stationary, Priority Alerts) */}
       <AlertManager
