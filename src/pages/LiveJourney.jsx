@@ -25,10 +25,16 @@ import JourneyRecorder from '../components/live-journey/JourneyRecorder';
 import JourneySummary from '../components/live-journey/JourneySummary';
 import EmergencyOverlay from '../components/live-journey/EmergencyOverlay';
 import EmergencySummary from '../components/live-journey/EmergencySummary';
+import DemoToggle from '../components/live-journey/DemoToggle';
+import { DEMO_DESTINATION, DEMO_ROUTE_POINTS, DEMO_STEPS } from '../services/DemoSimulator';
 import { journeyMemory } from '../services/JourneyMemory';
 import { generateJourneySummaryWithAI, generateEmergencySummaryWithAI } from '../services/aiService';
 
 export default function LiveJourney() {
+  // Demo Mode State
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoStepIndex, setDemoStepIndex] = useState(0);
+
   // Journey State: 'Idle' | 'Active' | 'Paused' | 'Ended'
   const [journeyState, setJourneyState] = useState('Idle');
   
@@ -83,7 +89,29 @@ export default function LiveJourney() {
     }
   ];
 
-  // Fetch OSRM Route line if available
+  // Demo Simulation Loop Effect
+  useEffect(() => {
+    if (!isDemoMode || journeyState !== 'Active') return;
+
+    setDestination(DEMO_DESTINATION);
+    setRouteCoordinates(DEMO_ROUTE_POINTS);
+
+    const interval = setInterval(() => {
+      setDemoStepIndex(prev => {
+        const next = prev + 1;
+        if (next >= DEMO_STEPS.length) {
+          clearInterval(interval);
+          handleEndJourney();
+          return prev;
+        }
+        return next;
+      });
+    }, 6000); // 6s per step advance (~1 minute demo run)
+
+    return () => clearInterval(interval);
+  }, [isDemoMode, journeyState]);
+
+  // Fetch OSRM Route line if available (Normal Mode)
   const fetchRouteLine = async (startLat, startLng, destLat, destLng) => {
     try {
       const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`);
@@ -95,7 +123,6 @@ export default function LiveJourney() {
         setEstimatedTime(durationMins);
       }
     } catch (err) {
-      // Fallback: direct vector line between points
       setRouteCoordinates([
         [startLat, startLng],
         [destLat, destLng]
@@ -107,7 +134,13 @@ export default function LiveJourney() {
     setJourneyState('Active');
     setSummaryData(null);
     setEmergencySummaryData(null);
-    if (currentLocation && destination) {
+
+    if (isDemoMode) {
+      setDemoStepIndex(0);
+      setDestination(DEMO_DESTINATION);
+      setRouteCoordinates(DEMO_ROUTE_POINTS);
+      setInitialDistance(1.8);
+    } else if (currentLocation && destination) {
       const dist = calculateHaversineDistance(
         currentLocation.lat,
         currentLocation.lng,
@@ -130,7 +163,6 @@ export default function LiveJourney() {
     const memoryEvents = journeyMemory.getMemory();
     setSummaryStats(stats);
 
-    // Call Gemini AI to generate trip summary report
     const aiSummary = await generateJourneySummaryWithAI({
       destinationName: destination?.name || 'Destination',
       stats,
@@ -138,6 +170,26 @@ export default function LiveJourney() {
     });
 
     setSummaryData(aiSummary);
+  };
+
+  const handleToggleDemoMode = (enabled) => {
+    setIsDemoMode(enabled);
+    setJourneyState('Idle');
+    setDemoStepIndex(0);
+    if (enabled) {
+      setDestination(DEMO_DESTINATION);
+      setRouteCoordinates(DEMO_ROUTE_POINTS);
+    }
+  };
+
+  const handleRestartDemo = () => {
+    setIsDemoMode(true);
+    setDemoStepIndex(0);
+    setJourneyState('Active');
+    setSummaryData(null);
+    setEmergencySummaryData(null);
+    setDestination(DEMO_DESTINATION);
+    setRouteCoordinates(DEMO_ROUTE_POINTS);
   };
 
   // Open Smart Emergency Mode
@@ -176,32 +228,42 @@ export default function LiveJourney() {
 
   return (
     <JourneyTracker>
-      {({ currentLocation, geoError }) => {
-        // Calculate dynamic real-time distance remaining
+      {({ currentLocation: realLocation, geoError }) => {
+        // Active Location depending on Demo Mode vs Normal Mode
+        const currentStepData = isDemoMode ? DEMO_STEPS[demoStepIndex] : null;
+        
+        const currentLocation = isDemoMode && currentStepData
+          ? currentStepData.location
+          : realLocation;
+
         const currentLat = currentLocation ? currentLocation.lat : 41.9028;
         const currentLng = currentLocation ? currentLocation.lng : 12.4964;
 
-        const distanceRemaining = destination && currentLocation
-          ? calculateHaversineDistance(currentLat, currentLng, destination.lat, destination.lng)
-          : 0;
+        const distanceRemaining = isDemoMode && currentStepData
+          ? currentStepData.distanceRemaining
+          : (destination && currentLocation ? calculateHaversineDistance(currentLat, currentLng, destination.lat, destination.lng) : 0);
 
-        // Calculate completion progress percentage
-        let progressPercentage = 0;
-        if (journeyState === 'Active' && initialDistance > 0 && distanceRemaining !== null) {
-          const travelled = initialDistance - distanceRemaining;
-          progressPercentage = (travelled / initialDistance) * 100;
-        }
+        const progressPercentage = isDemoMode && currentStepData
+          ? currentStepData.progress
+          : (journeyState === 'Active' && initialDistance > 0 ? ((initialDistance - distanceRemaining) / initialDistance) * 100 : 0);
 
-        // Fetch route line on location/destination updates
+        // Fetch route line for Normal Mode
         useEffect(() => {
-          if (currentLocation && destination) {
+          if (!isDemoMode && currentLocation && destination) {
             fetchRouteLine(currentLat, currentLng, destination.lat, destination.lng);
           }
-        }, [currentLat, currentLng, destination.lat, destination.lng]);
+        }, [isDemoMode, currentLat, currentLng, destination.lat, destination.lng]);
 
         return (
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-14 sm:gap-20 relative">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-10 sm:gap-16 relative">
             
+            {/* Demo Mode Toggle Banner at top */}
+            <DemoToggle
+              isDemoMode={isDemoMode}
+              onToggleDemoMode={handleToggleDemoMode}
+              onRestartDemo={handleRestartDemo}
+            />
+
             {/* Smart Emergency Mode Fullscreen Overlay */}
             {isEmergencyActive && (
               <EmergencyOverlay
@@ -220,7 +282,7 @@ export default function LiveJourney() {
                 
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
                   <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
-                  <span>Proactive AI Route Companion</span>
+                  <span>{isDemoMode ? 'Hackathon Simulation Engine' : 'Proactive AI Route Companion'}</span>
                 </div>
 
                 <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -228,7 +290,10 @@ export default function LiveJourney() {
                 </h1>
 
                 <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
-                  Monitor your trip in real time and stay informed with proactive AI safety updates throughout your journey.
+                  {isDemoMode 
+                    ? "Simulates full live journey tracking, route deviation alerts, risk evaluation & AI companion guidance in 2 minutes."
+                    : "Monitor your trip in real time and stay informed with proactive AI safety updates throughout your journey."
+                  }
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
@@ -237,7 +302,7 @@ export default function LiveJourney() {
                     onClick={() => handleStartJourney(currentLocation)}
                     className="btn-dark-green w-full sm:w-auto px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2"
                   >
-                    <span>Start Journey</span>
+                    <span>{isDemoMode ? 'Start Demo Run' : 'Start Journey'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -339,7 +404,7 @@ export default function LiveJourney() {
                   Live Journey Map
                 </h2>
                 <p className="text-xs text-[#666C68] font-normal">
-                  Pans automatically with your GPS position. Click anywhere on the map to set a new destination.
+                  {isDemoMode ? 'Simulated marker animating along predefined route.' : 'Pans automatically with your GPS position. Click anywhere on map to set destination.'}
                 </p>
               </div>
 
@@ -488,7 +553,7 @@ export default function LiveJourney() {
                 <Navigation className="w-7 h-7" />
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-normal text-[#222926] text-white font-heading tracking-tight">
+              <h2 className="text-3xl sm:text-5xl font-normal text-white font-heading tracking-tight">
                 Ready to begin your journey?
               </h2>
 
@@ -501,7 +566,7 @@ export default function LiveJourney() {
                 onClick={() => handleStartJourney(currentLocation)}
                 className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 shadow-xl mt-2"
               >
-                <span>Start Live Journey</span>
+                <span>{isDemoMode ? 'Start Demo Run' : 'Start Live Journey'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </section>
