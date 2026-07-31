@@ -142,7 +142,7 @@ export default function TravelPlanner() {
       return;
     }
 
-    console.log('[HALO AI Travel Planner] Form submitted, initiating AI itinerary generation...');
+    console.log('[HALO AI Travel Planner] Form submitted, initiating personalized AI itinerary generation...');
     setFullItinerary(null);
     setIsGenerating(true);
 
@@ -158,8 +158,6 @@ export default function TravelPlanner() {
       console.error('[HALO AI Travel Planner] Error during itinerary generation:', err);
       setValidationError('An error occurred while generating your travel itinerary. Please try again.');
     } finally {
-      // REQUIREMENT 8: Ensure loading state is ALWAYS cleared
-      console.log('[HALO AI Travel Planner] Clearing loading state in finally block.');
       setIsGenerating(false);
     }
   };
@@ -173,7 +171,7 @@ export default function TravelPlanner() {
           
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
             <Compass className="w-3.5 h-3.5 text-white" />
-            <span>Professional AI Vacation Planner</span>
+            <span>Professional Personalized AI Planner</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -181,7 +179,7 @@ export default function TravelPlanner() {
           </h1>
 
           <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
-            Configure your complete travel preferences, dates, budget, accommodations, and transit to generate a complete professional day-by-day vacation itinerary.
+            Configure your complete travel preferences, dates, budget, accommodations, and transit to generate a 100% personalized day-by-day vacation itinerary.
           </p>
 
           <a
@@ -264,7 +262,7 @@ export default function TravelPlanner() {
               {isGenerating ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
-                  <span>Generating Complete Professional Itinerary...</span>
+                  <span>Generating Personalized Vacation Itinerary...</span>
                 </>
               ) : (
                 <>
@@ -285,10 +283,10 @@ export default function TravelPlanner() {
           <Loader2 className="w-12 h-12 animate-spin text-[#1D2B26]" />
           <div className="flex flex-col gap-1 max-w-md">
             <span className="text-xl font-bold text-[#222926] font-heading">
-              Creating Full Day-by-Day Itinerary for {formData.destination}
+              Creating Personalized Itinerary for {formData.destination}
             </span>
             <span className="text-xs text-[#666C68]">
-              Curating morning, afternoon, evening, and night activities, accommodation recommendations, dining guides, and budget breakdowns...
+              Personalizing activities for a {formData.budgetType.toLowerCase()} {formData.tripType.toLowerCase()} traveler interested in {formData.selectedPreferences.join(', ')}...
             </span>
           </div>
         </div>
@@ -299,12 +297,20 @@ export default function TravelPlanner() {
       {!isGenerating && fullItinerary && (
         <div className="flex flex-col gap-14 animate-in fade-in duration-400">
           
+          {/* Personalization Rationale Banner */}
+          {fullItinerary.personalizationRationale && (
+            <div className="editorial-white-card p-6 border border-emerald-300 bg-emerald-50/70 text-emerald-950 flex items-center gap-3 font-semibold text-xs sm:text-sm font-heading shadow-sm">
+              <Sparkles className="w-5 h-5 text-emerald-700 shrink-0" />
+              <span>"{fullItinerary.personalizationRationale}"</span>
+            </div>
+          )}
+
           {/* SECTION 1: Trip Overview Hero Card */}
           <section className="reference-hero-container p-8 sm:p-12 text-white flex flex-col gap-6 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/20 pb-4">
               <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-white/90">
                 <Sparkles className="w-4 h-4 text-white" />
-                <span>Professional Itinerary Report</span>
+                <span>Personalized Itinerary Report</span>
               </div>
               <span className="px-4 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md self-start sm:self-auto">
                 Theme: {fullItinerary.tripOverview?.tripTheme}
@@ -337,7 +343,7 @@ export default function TravelPlanner() {
 
               <div className="flex flex-col gap-1 sm:col-span-3">
                 <span className="text-xs uppercase tracking-wider opacity-75 font-semibold">
-                  Agency Overview
+                  Personalized Overview
                 </span>
                 <p className="text-sm font-light leading-relaxed text-white/90">
                   "{fullItinerary.tripOverview?.overviewText}"
@@ -512,7 +518,7 @@ export default function TravelPlanner() {
                   <span>Recommended Places to Stay</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#222926] font-heading">
-                  Accommodation Options
+                  Accommodation Options ({formData.accommodation})
                 </h2>
               </div>
 
@@ -543,7 +549,7 @@ export default function TravelPlanner() {
               <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
                   <Bus className="w-4 h-4 text-[#1D2B26]" />
-                  <span>Transit Strategy & Costs</span>
+                  <span>Transit Strategy ({formData.transport})</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#222926] font-heading">
                   Transportation Plan
@@ -596,7 +602,7 @@ export default function TravelPlanner() {
               <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
                   <Utensils className="w-4 h-4 text-[#1D2B26]" />
-                  <span>Curated Culinary Guide</span>
+                  <span>Curated Culinary Guide ({formData.foodPreferences.join(', ')})</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#222926] font-heading">
                   Daily Restaurant Guide
@@ -624,7 +630,7 @@ export default function TravelPlanner() {
               <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
                   <Wallet className="w-4 h-4 text-[#1D2B26]" />
-                  <span>Itemized Expense Allocation</span>
+                  <span>Itemized Expense Allocation ({formData.budgetType})</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#222926] font-heading">
                   Budget Breakdown
