@@ -1,21 +1,34 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Siren, AlertTriangle, ShieldCheck, PhoneCall, MapPin, X } from 'lucide-react';
+import { 
+  Siren, 
+  AlertTriangle, 
+  ShieldCheck, 
+  PhoneCall, 
+  MapPin, 
+  X, 
+  CheckCircle2, 
+  MessageSquare, 
+  Navigation, 
+  Hospital, 
+  Sparkles,
+  ArrowRight
+} from 'lucide-react';
 import { journeyMemory } from '../services/JourneyMemory';
 
 export default function GlobalFloatingSOS() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [showModal, setShowModal] = useState(false);
+
+  // Workflow State: 'IDLE' | 'CONFIRM' | 'RESOURCES_READY'
+  const [sosState, setSosState] = useState('IDLE');
 
   // Do not render floating button on Emergency Escape page
   if (location.pathname === '/emergency-escape') {
     return null;
   }
 
-  const handleConfirmSOS = () => {
-    setShowModal(false);
-    
+  const handleActivateSOSConfirm = () => {
     // Ingest emergency state into journeyMemory
     const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     journeyMemory.updateMemory({
@@ -23,13 +36,29 @@ export default function GlobalFloatingSOS() {
       emergencyActive: true,
       emergencyStartTime: currentTime,
       aiCompanionMessages: [
-        { id: Date.now(), timestamp: currentTime, text: "Manual SOS triggered. Activating Emergency Command Center.", isEmergency: true },
+        { id: Date.now(), timestamp: currentTime, text: "Manual SOS triggered. Emergency resources prepared.", isEmergency: true },
         ...(journeyMemory.getMemory().aiCompanionMessages || [])
       ]
     });
 
+    // Move to RESOURCES_READY summary step
+    setSosState('RESOURCES_READY');
+  };
+
+  const handleContinueToEmergencyCenter = () => {
+    setSosState('IDLE');
     navigate('/emergency-escape');
   };
+
+  const checklistItems = [
+    { title: "Live location prepared", desc: "Encrypted sync link ready to share.", icon: MapPin },
+    { title: "Emergency contact ready to call", desc: "Speed dial prepared for Sarah Miller.", icon: PhoneCall },
+    { title: "WhatsApp/SMS message prepared", desc: "Location text draft ready with coordinates.", icon: MessageSquare },
+    { title: "Nearest safe route generated", desc: "Escape corridor plotted via Via Nazionale.", icon: Navigation },
+    { title: "Nearby police station identified", desc: "Central Police Station (0.4 km).", icon: ShieldCheck },
+    { title: "Nearby hospital identified", desc: "City General Hospital (0.8 km).", icon: Hospital },
+    { title: "Emergency Command Center ready", desc: "Situation report & action panel initialized.", icon: Sparkles }
+  ];
 
   return (
     <>
@@ -37,7 +66,7 @@ export default function GlobalFloatingSOS() {
       <div className="fixed bottom-6 right-6 z-50">
         <button
           type="button"
-          onClick={() => setShowModal(true)}
+          onClick={() => setSosState('CONFIRM')}
           className="group relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/40"
           title="Trigger Manual SOS"
         >
@@ -49,14 +78,14 @@ export default function GlobalFloatingSOS() {
         </button>
       </div>
 
-      {/* Confirmation Modal */}
-      {showModal && (
+      {/* STEP 1: Initial Confirmation Modal */}
+      {sosState === 'CONFIRM' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="editorial-white-card p-6 sm:p-8 max-w-md w-full border-2 border-rose-300 shadow-2xl flex flex-col gap-6 text-left relative animate-in zoom-in-95 duration-200">
             
             <button
               type="button"
-              onClick={() => setShowModal(false)}
+              onClick={() => setSosState('IDLE')}
               className="absolute top-4 right-4 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -100,7 +129,7 @@ export default function GlobalFloatingSOS() {
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-black/5">
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
+                onClick={() => setSosState('IDLE')}
                 className="px-5 py-2.5 rounded-xl border border-black/10 text-xs font-extrabold uppercase tracking-wider text-[#666C68] hover:bg-slate-100 transition-all"
               >
                 Cancel
@@ -108,10 +137,80 @@ export default function GlobalFloatingSOS() {
 
               <button
                 type="button"
-                onClick={handleConfirmSOS}
+                onClick={handleActivateSOSConfirm}
                 className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold uppercase tracking-wider shadow-md transition-all"
               >
                 Activate SOS
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2: Emergency Resources Ready Summary Modal */}
+      {sosState === 'RESOURCES_READY' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="editorial-white-card p-7 sm:p-9 max-w-lg w-full border-2 border-emerald-300 shadow-2xl bg-white/95 backdrop-blur-xl flex flex-col gap-6 text-left relative animate-in zoom-in-95 duration-300">
+            
+            <div className="flex items-center gap-3.5 border-b border-black/5 pb-4">
+              <div className="w-11 h-11 rounded-2xl bg-[#1D2B26] text-white flex items-center justify-center shrink-0 shadow-md">
+                <Sparkles className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800">HALO Ready</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                </div>
+                <h3 className="text-2xl font-bold text-[#222926] font-heading">
+                  Emergency Resources Ready
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-[#666C68] font-normal leading-relaxed">
+              HALO has prepared the following emergency resources for you:
+            </p>
+
+            {/* Staggered Checklist */}
+            <div className="flex flex-col gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+              {checklistItems.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-slate-50 border border-black/5 flex items-start gap-3 animate-in fade-in slide-in-from-left-4 duration-400"
+                    style={{ animationDelay: `${idx * 120}ms` }}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-300">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    </div>
+
+                    <div className="flex flex-col text-left flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#222926]">
+                          {item.title}
+                        </span>
+                        <Icon className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <span className="text-[11px] text-[#666C68]">
+                        {item.desc}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom CTA Button */}
+            <div className="pt-4 border-t border-black/5 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleContinueToEmergencyCenter}
+                className="btn-dark-green w-full py-4 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 shadow-xl hover:scale-[1.005] transition-all"
+              >
+                <span>Continue to Emergency Center</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
 
