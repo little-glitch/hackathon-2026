@@ -21,6 +21,7 @@ import LiveMap from '../components/live-journey/LiveMap';
 import JourneyStatusCard from '../components/live-journey/JourneyStatusCard';
 import JourneyControls from '../components/live-journey/JourneyControls';
 import AIJourneyMonitor from '../components/live-journey/AIJourneyMonitor';
+import JourneyRecorder from '../components/live-journey/JourneyRecorder';
 
 export default function LiveJourney() {
   // Journey State: 'Idle' | 'Active' | 'Paused'
@@ -215,6 +216,15 @@ export default function LiveJourney() {
                 progressPercentage={progressPercentage}
               />
             </section>
+
+
+            {/* Telemetry Recorder Log Container */}
+            <JourneyRecorder
+              journeyState={journeyState}
+              currentLocation={currentLocation}
+              distanceRemaining={distanceRemaining}
+              progressPercentage={progressPercentage}
+            />
 
 
             {/* SECTION 4: Interactive Leaflet Map */}
