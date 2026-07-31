@@ -7,6 +7,7 @@ import TravelPlanner from './pages/TravelPlanner';
 import LiveJourney from './pages/LiveJourney';
 import IsItSafe from './pages/IsItSafe';
 import EmergencyEscape from './pages/EmergencyEscape';
+import SafetyCircle from './pages/SafetyCircle';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/planner" element={<TravelPlanner />} />
             <Route path="/live-journey" element={<LiveJourney />} />
             <Route path="/is-it-safe" element={<IsItSafe />} />
+            <Route path="/safety-circle" element={<SafetyCircle />} />
             <Route path="/emergency" element={<EmergencyEscape />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

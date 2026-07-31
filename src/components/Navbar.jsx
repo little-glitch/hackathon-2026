@@ -8,7 +8,8 @@ import {
   LifeBuoy, 
   Menu, 
   X,
-  ArrowRight
+  ArrowRight,
+  Users
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -18,8 +19,9 @@ export default function Navbar() {
   const navItems = [
     { name: 'Home', path: '/', icon: Shield },
     { name: 'Travel Planner', path: '/planner', icon: Compass },
-    { name: 'Live Journey', path: '/live-journey', icon: Navigation, badge: 'Live' },
+    { name: 'Live Journey', path: '/live-journey', icon: Navigation },
     { name: 'Is It Safe?', path: '/is-it-safe', icon: ShieldAlert },
+    { name: 'Safety Circle', path: '/safety-circle', icon: Users },
     { name: 'Emergency', path: '/emergency', icon: LifeBuoy, highlight: true },
   ];
 
@@ -84,7 +86,7 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* CTA Right (Dark Capsule matching image.jpeg "BOOK A DEMO") */}
+          {/* CTA Right */}
           <div className="hidden lg:flex items-center shrink-0">
             <NavLink
               to="/planner"
@@ -99,18 +101,18 @@ export default function Navbar() {
           <div className="lg:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-lg text-[#1D2B26] hover:bg-black/5 border border-black/5 transition-colors focus:outline-none"
-              aria-label="Toggle menu"
+              className="p-2 rounded-xl text-[#1D2B26] hover:bg-black/5 transition-colors focus:outline-none"
+              aria-label="Toggle navigation menu"
             >
-              {isOpen ? <X className="w-5 h-5 text-[#1D2B26]" /> : <Menu className="w-5 h-5 text-[#1D2B26]" />}
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
 
         </div>
 
-        {/* Mobile Slide-Down Menu Drawer */}
+        {/* Mobile Dropdown */}
         {isOpen && (
-          <div className="lg:hidden mt-4 pt-4 border-t border-black/5 flex flex-col gap-2 pb-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="lg:hidden pt-4 pb-2 px-2 flex flex-col gap-2 border-t border-black/5 mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -120,30 +122,22 @@ export default function Navbar() {
                   key={item.path}
                   to={item.path}
                   onClick={closeMenu}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                     isActive
-                      ? 'bg-[#1D2B26]/10 text-[#1D2B26] font-bold'
+                      ? 'bg-[#1D2B26] text-white'
                       : 'text-[#666C68] hover:text-[#1D2B26] hover:bg-black/5'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-[#1D2B26]' : 'text-[#666C68]'}`} />
+                    <Icon className="w-4 h-4" />
                     <span>{item.name}</span>
                   </div>
                 </NavLink>
               );
             })}
-
-            <NavLink
-              to="/planner"
-              onClick={closeMenu}
-              className="btn-dark-green mt-2 w-full py-3 text-xs font-bold uppercase tracking-widest text-center flex items-center justify-center gap-2"
-            >
-              <span>Plan Journey</span>
-              <ArrowRight className="w-4 h-4" />
-            </NavLink>
           </div>
         )}
+
       </nav>
     </header>
   );
