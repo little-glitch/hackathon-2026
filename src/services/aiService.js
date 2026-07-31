@@ -14,6 +14,14 @@ export async function analyzeDestinationSafetyWithAI({
   travelMode = 'Walking',
   additionalNotes = ''
 }) {
+  console.log('[HALO AI] 1. Frontend form inputs received:', {
+    destination,
+    travelDate,
+    travelTime,
+    travelMode,
+    additionalNotes
+  });
+
   const prompt = `
 You are HALO, a professional travel safety advisor.
 Analyze destination safety for a solo traveler dynamically based on these exact input parameters:
@@ -32,32 +40,32 @@ CRITICAL INSTRUCTIONS:
 
 Respond ONLY in valid JSON matching this schema:
 {
-  "safetyScore": 92,
+  "safetyScore": 88,
   "riskLevel": "Low" | "Moderate" | "High",
   "overallAssessment": "Safety score assigned [SCORE]/100 because travelling by [MODE] at [TIME] in [DESTINATION]...",
   "riskBreakdown": {
     "personalSafety": {
-      "score": 94,
+      "score": 88,
       "explanation": "Specific personal safety evaluation for [TIME] and [MODE].",
       "recommendation": "Key recommendation tailored to [MODE]."
     },
     "transportation": {
-      "score": 90,
+      "score": 85,
       "explanation": "Specific transit mode evaluation for [MODE] at [TIME].",
       "recommendation": "Key transportation recommendation."
     },
     "environmental": {
-      "score": 95,
+      "score": 90,
       "explanation": "Weather and street lighting evaluation for [TIME].",
       "recommendation": "Key environmental precaution."
     },
     "crowdLevel": {
-      "score": 88,
+      "score": 82,
       "explanation": "Crowd density assessment for [TIME].",
       "recommendation": "Key crowd management tip."
     },
     "generalAdvice": {
-      "score": 93,
+      "score": 86,
       "explanation": "Overall corridor status.",
       "recommendation": "Primary general precaution."
     }
@@ -79,8 +87,11 @@ Respond ONLY in valid JSON matching this schema:
 }
 `;
 
+  console.log('[HALO AI] 2. Gemini Prompt constructed:', prompt);
+
   if (GEMINI_API_KEY) {
     try {
+      console.log('[HALO AI] 3. Calling Gemini API...');
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -93,19 +104,27 @@ Respond ONLY in valid JSON matching this schema:
       );
 
       const data = await response.json();
+      console.log('[HALO AI] 4. Raw Gemini API Response:', data);
+
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      console.log('[HALO AI] 5. Raw Gemini Text:', text);
 
       if (text) {
         const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanText);
+        const parsed = JSON.parse(cleanText);
+        console.log('[HALO AI] 6. Processed Safety Report Output:', parsed);
+        return parsed;
       }
     } catch (err) {
-      console.warn('Gemini safety analysis call failed, using dynamic fallback engine:', err);
+      console.warn('[HALO AI] Gemini API call failed, using dynamic fallback engine:', err);
     }
   }
 
   // Dynamic Fallback Safety Reasoning Engine
-  return fallbackDestinationSafetyReasoning({ destination, travelDate, travelTime, travelMode, additionalNotes });
+  console.log('[HALO AI] 3 (Fallback). Executing Dynamic Local Reasoning Engine...');
+  const fallbackResult = fallbackDestinationSafetyReasoning({ destination, travelDate, travelTime, travelMode, additionalNotes });
+  console.log('[HALO AI] 6 (Fallback). Processed Safety Report Output:', fallbackResult);
+  return fallbackResult;
 }
 
 /**
@@ -129,16 +148,15 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
   const isLateNight = hour >= 22 || hour <= 4;
   const isEvening = hour >= 19 && hour < 22;
   const isEarlyMorning = hour >= 5 && hour < 7;
-  const isDaytime = hour >= 7 && hour < 19;
 
   let baseScore = 94;
   let timeTag = 'daylight hours';
 
   if (isLateNight) {
-    baseScore = 64;
+    baseScore = 62;
     timeTag = `late night (${timeStr})`;
   } else if (isEvening) {
-    baseScore = 80;
+    baseScore = 82;
     timeTag = `evening (${timeStr})`;
   } else if (isEarlyMorning) {
     baseScore = 86;
@@ -154,26 +172,26 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
 
   if (mode === 'Walking') {
     if (isLateNight) {
-      modeAdjustment = -12;
+      modeAdjustment = -10;
       modeDesc = 'walking solo on foot late at night increases exposure along unlit alleys';
     } else if (isEvening) {
-      modeAdjustment = -4;
+      modeAdjustment = -3;
       modeDesc = 'walking on foot requires attention to street illumination';
     } else {
-      modeAdjustment = 0;
+      modeAdjustment = +1;
       modeDesc = 'walking on foot during daylight provides excellent visibility and high pedestrian activity';
     }
   } else if (mode === 'Rideshare') {
     if (isLateNight) {
-      modeAdjustment = +14; // High safety recovery at night!
+      modeAdjustment = +16; // High safety recovery at night!
       modeDesc = 'utilizing door-to-door rideshare significantly reduces street exposure late at night';
     } else {
-      modeAdjustment = +2;
+      modeAdjustment = +3;
       modeDesc = 'rideshare transit offers secure, direct door-to-door transportation';
     }
   } else if (mode === 'Transit') {
     if (isLateNight) {
-      modeAdjustment = -6;
+      modeAdjustment = -5;
       modeDesc = 'public transit late at night requires waiting at designated well-lit hubs';
     } else {
       modeAdjustment = +2;
@@ -181,7 +199,7 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
     }
   } else if (mode === 'Cycling') {
     if (isLateNight) {
-      modeAdjustment = -8;
+      modeAdjustment = -7;
       modeDesc = 'cycling at night requires high-visibility gear and front/rear lights';
     } else {
       modeAdjustment = +1;
@@ -192,7 +210,7 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
   // 3. User Notes Adjustment
   let notesAdjustment = 0;
   if (notes.includes('solo') || notes.includes('alone') || notes.includes('camera') || notes.includes('gear') || notes.includes('bag')) {
-    notesAdjustment = -4;
+    notesAdjustment = -3;
   }
 
   // Compute Final Clamped Score
@@ -248,6 +266,9 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
   thingsToRemember.push(`HALO Live Location sharing active (${mode} Mode)`);
   thingsToRemember.push(`Offline map cached for ${destName}`);
 
+  // Dynamic Category Scores
+  const crowdScore = isLateNight ? 68 : (isEvening ? 82 : 92);
+
   return {
     safetyScore,
     riskLevel,
@@ -264,12 +285,12 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
         recommendation: mode === 'Rideshare' ? "Confirm driver credentials before boarding." : "Keep transit pass ready."
       },
       environmental: {
-        score: isLateNight ? 82 : 95,
+        score: isLateNight ? 80 : 95,
         explanation: `Street illumination and weather visibility assessed for ${timeTag}.`,
         recommendation: isLateNight ? "Carry a small flashlight or keep phone torch accessible." : "Comfortable walking shoes recommended."
       },
       crowdLevel: {
-        score: isLateNight ? 72 : 90,
+        score: crowdScore,
         explanation: `Foot traffic density in ${destName} is expected to be ${isLateNight ? 'low' : 'moderate to high'}.`,
         recommendation: isLateNight ? "Avoid unpopulated streets." : "Keep wallet and phone secure in crowds."
       },
