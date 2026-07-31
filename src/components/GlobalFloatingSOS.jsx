@@ -28,24 +28,25 @@ export default function GlobalFloatingSOS() {
     return null;
   }
 
-  const handleActivateSOSConfirm = () => {
-    // Ingest emergency state into journeyMemory
-    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    journeyMemory.updateMemory({
-      riskLevel: 'High',
-      emergencyActive: true,
-      emergencyStartTime: currentTime,
-      aiCompanionMessages: [
-        { id: Date.now(), timestamp: currentTime, text: "Manual SOS triggered. Emergency resources prepared.", isEmergency: true },
-        ...(journeyMemory.getMemory().aiCompanionMessages || [])
-      ]
-    });
+  const handleActivateSOSConfirm = (e) => {
+    if (e) e.preventDefault();
+    console.log('[HALO SOS] 1. Activate SOS clicked in confirmation dialog. Updating state to RESOURCES_READY...');
 
-    // Move to RESOURCES_READY summary step
+    try {
+      if (journeyMemory && typeof journeyMemory.recordEvent === 'function') {
+        journeyMemory.recordEvent('Manual SOS Triggered', 'User confirmed emergency SOS activation. Preparing resources.', 'Critical');
+      }
+    } catch (err) {
+      console.warn('[HALO SOS] journeyMemory record error ignored:', err);
+    }
+
+    // Step 2: Transition state from CONFIRM -> RESOURCES_READY
     setSosState('RESOURCES_READY');
   };
 
-  const handleContinueToEmergencyCenter = () => {
+  const handleContinueToEmergencyCenter = (e) => {
+    if (e) e.preventDefault();
+    console.log('[HALO SOS] 2. Continue to Emergency Center clicked. Navigating to /emergency-escape...');
     setSosState('IDLE');
     navigate('/emergency-escape');
   };
@@ -67,7 +68,7 @@ export default function GlobalFloatingSOS() {
         <button
           type="button"
           onClick={() => setSosState('CONFIRM')}
-          className="group relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/40"
+          className="group relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/40 cursor-pointer"
           title="Trigger Manual SOS"
         >
           {/* Subtle Radar Pulse Ping */}
@@ -130,7 +131,7 @@ export default function GlobalFloatingSOS() {
               <button
                 type="button"
                 onClick={() => setSosState('IDLE')}
-                className="px-5 py-2.5 rounded-xl border border-black/10 text-xs font-extrabold uppercase tracking-wider text-[#666C68] hover:bg-slate-100 transition-all"
+                className="px-5 py-2.5 rounded-xl border border-black/10 text-xs font-extrabold uppercase tracking-wider text-[#666C68] hover:bg-slate-100 transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -138,7 +139,7 @@ export default function GlobalFloatingSOS() {
               <button
                 type="button"
                 onClick={handleActivateSOSConfirm}
-                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold uppercase tracking-wider shadow-md transition-all"
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold uppercase tracking-wider shadow-md transition-all cursor-pointer"
               >
                 Activate SOS
               </button>
@@ -180,7 +181,7 @@ export default function GlobalFloatingSOS() {
                   <div
                     key={idx}
                     className="p-3.5 rounded-xl bg-slate-50 border border-black/5 flex items-start gap-3 animate-in fade-in slide-in-from-left-4 duration-400"
-                    style={{ animationDelay: `${idx * 120}ms` }}
+                    style={{ animationDelay: `${idx * 100}ms` }}
                   >
                     <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-300">
                       <CheckCircle2 className="w-4 h-4 text-emerald-700" />
@@ -207,7 +208,7 @@ export default function GlobalFloatingSOS() {
               <button
                 type="button"
                 onClick={handleContinueToEmergencyCenter}
-                className="btn-dark-green w-full py-4 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 shadow-xl hover:scale-[1.005] transition-all"
+                className="btn-dark-green w-full py-4 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 shadow-xl hover:scale-[1.005] transition-all cursor-pointer"
               >
                 <span>Continue to Emergency Center</span>
                 <ArrowRight className="w-4 h-4" />
