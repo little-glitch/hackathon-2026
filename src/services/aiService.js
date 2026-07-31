@@ -1,11 +1,11 @@
 /**
- * HALO AI Monitoring & Destination Safety Analysis Service
+ * HALO AI Monitoring & Dynamic Destination Safety Analysis Service
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 /**
- * Analyzes destination safety before travel using Gemini API
+ * Analyzes destination safety before travel dynamically using Gemini API
  */
 export async function analyzeDestinationSafetyWithAI({
   destination = '',
@@ -16,7 +16,7 @@ export async function analyzeDestinationSafetyWithAI({
 }) {
   const prompt = `
 You are HALO, a professional travel safety advisor.
-Analyze the destination safety for a solo traveler with the following parameters:
+Analyze destination safety for a solo traveler dynamically based on these exact input parameters:
 
 Destination: ${destination || 'City Center'}
 Date of Travel: ${travelDate || 'Today'}
@@ -24,54 +24,58 @@ Time of Travel: ${travelTime || 'Current Hour'}
 Travel Mode: ${travelMode}
 Additional Notes: ${additionalNotes || 'None'}
 
-Provide a balanced, professional safety analysis. Avoid exaggerated warnings or unsupported claims. Keep responses calm, reassuring, and actionable.
+CRITICAL INSTRUCTIONS:
+1. Calculate a dynamic safetyScore (0-100) specifically tailored to the interaction between Time of Travel (${travelTime}), Travel Mode (${travelMode}), and Destination (${destination}).
+   - Example: Walking at 11:30 PM (23:30) must yield a significantly lower score (50-65) than Rideshare at 11:30 PM (78-86) or Walking at 2:00 PM (90-96).
+2. The overallAssessment MUST explicitly state WHY this specific score was assigned based on time and transit mode.
+3. Every recommendation MUST be personalized to the selected travel mode (${travelMode}) and time (${travelTime}).
 
 Respond ONLY in valid JSON matching this schema:
 {
   "safetyScore": 92,
   "riskLevel": "Low" | "Moderate" | "High",
-  "overallAssessment": "1-2 sentence overall assessment of destination safety for this trip context.",
+  "overallAssessment": "Safety score assigned [SCORE]/100 because travelling by [MODE] at [TIME] in [DESTINATION]...",
   "riskBreakdown": {
     "personalSafety": {
       "score": 94,
-      "explanation": "Brief explanation of personal security in this area.",
-      "recommendation": "Key recommendation for personal safety."
+      "explanation": "Specific personal safety evaluation for [TIME] and [MODE].",
+      "recommendation": "Key recommendation tailored to [MODE]."
     },
     "transportation": {
       "score": 90,
-      "explanation": "Brief transit safety overview for selected mode.",
-      "recommendation": "Key recommendation for transportation."
+      "explanation": "Specific transit mode evaluation for [MODE] at [TIME].",
+      "recommendation": "Key transportation recommendation."
     },
     "environmental": {
       "score": 95,
-      "explanation": "Weather and environmental conditions evaluation.",
+      "explanation": "Weather and street lighting evaluation for [TIME].",
       "recommendation": "Key environmental precaution."
     },
     "crowdLevel": {
       "score": 88,
-      "explanation": "Foot traffic and crowd density assessment.",
+      "explanation": "Crowd density assessment for [TIME].",
       "recommendation": "Key crowd management tip."
     },
     "generalAdvice": {
       "score": 93,
-      "explanation": "Overall travel corridor status.",
+      "explanation": "Overall corridor status.",
       "recommendation": "Primary general precaution."
     }
   },
   "recommendations": [
-    "Travel during recommended daylight windows.",
-    "Use lit primary thoroughfares rather than isolated shortcuts.",
-    "Share live route tracking link with trusted emergency contacts.",
-    "Ensure mobile battery is charged above 50% before departure."
+    "Personalized recommendation 1 for [MODE] at [TIME]",
+    "Personalized recommendation 2 for [MODE] at [TIME]",
+    "Personalized recommendation 3 for [MODE] at [TIME]",
+    "Personalized recommendation 4 for [MODE] at [TIME]"
   ],
   "recommendedTravelWindow": "08:00 AM - 08:30 PM",
   "thingsToRemember": [
-    "Emergency contacts saved on mobile",
-    "Phone charged above 50%",
-    "Live location sharing enabled",
-    "Offline map corridor cached"
+    "Checklist item 1 for [MODE]",
+    "Checklist item 2 for [TIME]",
+    "Checklist item 3",
+    "Checklist item 4"
   ],
-  "finalSummary": "Overall, this destination offers a monitored travel corridor when following standard urban safety precautions."
+  "finalSummary": "Final tailored summary statement."
 }
 `;
 
@@ -96,65 +100,189 @@ Respond ONLY in valid JSON matching this schema:
         return JSON.parse(cleanText);
       }
     } catch (err) {
-      console.warn('Gemini safety analysis call failed, using fallback reasoning:', err);
+      console.warn('Gemini safety analysis call failed, using dynamic fallback engine:', err);
     }
   }
 
-  // Fallback Destination Safety Reasoning Engine
-  return fallbackDestinationSafetyReasoning({ destination, travelTime, travelMode, additionalNotes });
+  // Dynamic Fallback Safety Reasoning Engine
+  return fallbackDestinationSafetyReasoning({ destination, travelDate, travelTime, travelMode, additionalNotes });
 }
 
-function fallbackDestinationSafetyReasoning({ destination, travelTime, travelMode, additionalNotes }) {
-  const isNight = travelTime.includes('22:') || travelTime.includes('23:') || travelTime.includes('00:') || travelTime.includes('01:') || travelTime.includes('02:') || travelTime.includes('03:') || travelTime.includes('04:');
+/**
+ * Intelligent Dynamic Fallback Engine calculating weighted safety scores and custom text
+ */
+function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTime, travelMode, additionalNotes }) {
+  const destName = destination || 'Selected Destination';
+  const mode = travelMode || 'Walking';
+  const timeStr = travelTime || '14:00';
+  const notes = (additionalNotes || '').toLowerCase();
 
-  const baseScore = isNight ? 78 : 94;
-  const riskLevel = isNight ? 'Moderate' : 'Low';
+  // Extract hour integer (0 - 23)
+  let hour = 14;
+  if (timeStr.includes(':')) {
+    const parts = timeStr.split(':');
+    hour = parseInt(parts[0], 10);
+    if (isNaN(hour)) hour = 14;
+  }
+
+  // 1. Time Factor Base Calculation
+  const isLateNight = hour >= 22 || hour <= 4;
+  const isEvening = hour >= 19 && hour < 22;
+  const isEarlyMorning = hour >= 5 && hour < 7;
+  const isDaytime = hour >= 7 && hour < 19;
+
+  let baseScore = 94;
+  let timeTag = 'daylight hours';
+
+  if (isLateNight) {
+    baseScore = 64;
+    timeTag = `late night (${timeStr})`;
+  } else if (isEvening) {
+    baseScore = 80;
+    timeTag = `evening (${timeStr})`;
+  } else if (isEarlyMorning) {
+    baseScore = 86;
+    timeTag = `early morning (${timeStr})`;
+  } else {
+    baseScore = 94;
+    timeTag = `daytime (${timeStr})`;
+  }
+
+  // 2. Mode Adjustment Factor
+  let modeAdjustment = 0;
+  let modeDesc = '';
+
+  if (mode === 'Walking') {
+    if (isLateNight) {
+      modeAdjustment = -12;
+      modeDesc = 'walking solo on foot late at night increases exposure along unlit alleys';
+    } else if (isEvening) {
+      modeAdjustment = -4;
+      modeDesc = 'walking on foot requires attention to street illumination';
+    } else {
+      modeAdjustment = 0;
+      modeDesc = 'walking on foot during daylight provides excellent visibility and high pedestrian activity';
+    }
+  } else if (mode === 'Rideshare') {
+    if (isLateNight) {
+      modeAdjustment = +14; // High safety recovery at night!
+      modeDesc = 'utilizing door-to-door rideshare significantly reduces street exposure late at night';
+    } else {
+      modeAdjustment = +2;
+      modeDesc = 'rideshare transit offers secure, direct door-to-door transportation';
+    }
+  } else if (mode === 'Transit') {
+    if (isLateNight) {
+      modeAdjustment = -6;
+      modeDesc = 'public transit late at night requires waiting at designated well-lit hubs';
+    } else {
+      modeAdjustment = +2;
+      modeDesc = 'public transit operates with high frequency and active station monitoring during daytime';
+    }
+  } else if (mode === 'Cycling') {
+    if (isLateNight) {
+      modeAdjustment = -8;
+      modeDesc = 'cycling at night requires high-visibility gear and front/rear lights';
+    } else {
+      modeAdjustment = +1;
+      modeDesc = 'cycling along dedicated bike lanes provides efficient transit';
+    }
+  }
+
+  // 3. User Notes Adjustment
+  let notesAdjustment = 0;
+  if (notes.includes('solo') || notes.includes('alone') || notes.includes('camera') || notes.includes('gear') || notes.includes('bag')) {
+    notesAdjustment = -4;
+  }
+
+  // Compute Final Clamped Score
+  const rawScore = baseScore + modeAdjustment + notesAdjustment;
+  const safetyScore = Math.min(98, Math.max(35, rawScore));
+
+  // Determine Risk Level
+  let riskLevel = 'Low';
+  if (safetyScore < 65) {
+    riskLevel = 'High';
+  } else if (safetyScore < 82) {
+    riskLevel = 'Moderate';
+  } else {
+    riskLevel = 'Low';
+  }
+
+  // Generate Personalized Recommendations & Checklist
+  const recommendations = [];
+  const thingsToRemember = [];
+
+  if (mode === 'Walking') {
+    if (isLateNight) {
+      recommendations.push(`Stick strictly to primary lit avenues in ${destName}; avoid dark unmonitored alleys at ${timeStr}.`);
+      recommendations.push("Maintain active spatial awareness and avoid wearing noise-canceling headphones.");
+      recommendations.push("Share your live HALO tracking corridor link with a trusted contact before starting your walk.");
+      recommendations.push("Have a rideshare app open as a backup transport option if streets become quiet.");
+    } else {
+      recommendations.push(`Enjoy your daytime walk to ${destName} along active pedestrian corridors.`);
+      recommendations.push("Keep phone battery charged above 40% to maintain live GPS tracking.");
+      recommendations.push("Stay aware of local traffic and bicycle crossings at major intersections.");
+      recommendations.push("Share your live journey corridor with family or friends.");
+    }
+  } else if (mode === 'Rideshare') {
+    recommendations.push(`Verify the driver's license plate and vehicle model before entering your rideshare to ${destName}.`);
+    recommendations.push("Sit in the rear seat for maximum personal space and safety.");
+    recommendations.push("Share your in-app ride status and HALO live location link with a contact.");
+    recommendations.push("Ensure destination address is accurately set in your navigation app.");
+  } else if (mode === 'Transit') {
+    recommendations.push(`Wait for your bus/tram at lit main stations with CCTV coverage in ${destName}.`);
+    recommendations.push("Keep digital tickets or transit cards accessible on your phone before boarding.");
+    recommendations.push("Secure personal belongings and zip bags in crowded transit vehicles.");
+    recommendations.push("Monitor upcoming stop announcements to avoid missing your destination.");
+  } else {
+    recommendations.push(`Ensure front headlight and rear reflector are active when cycling to ${destName}.`);
+    recommendations.push("Follow marked bicycle lanes and obey municipal traffic signals.");
+    recommendations.push("Wear a helmet and high-visibility clothing.");
+    recommendations.push("Park and lock your bicycle at designated, well-lit bicycle racks.");
+  }
+
+  // Checklist items
+  thingsToRemember.push(`Emergency contacts saved for ${destName}`);
+  thingsToRemember.push(`Phone battery charged above 50% for ${timeStr} trip`);
+  thingsToRemember.push(`HALO Live Location sharing active (${mode} Mode)`);
+  thingsToRemember.push(`Offline map cached for ${destName}`);
 
   return {
-    safetyScore: baseScore,
+    safetyScore,
     riskLevel,
-    overallAssessment: `${destination || 'Target Location'} is generally safe and well-monitored. ${isNight ? 'Night transit requires extra awareness along secondary corridors.' : 'Daytime foot traffic and visibility remain high across primary avenues.'}`,
+    overallAssessment: `Safety score assigned ${safetyScore}/100 because ${modeDesc} to ${destName} during ${timeTag}.`,
     riskBreakdown: {
       personalSafety: {
-        score: baseScore,
-        explanation: `Personal security index is rated ${isNight ? 'MODERATE' : 'HIGH'} for ${destination || 'this region'}.`,
-        recommendation: "Stick to well-lit main plazas and avoid unmonitored alley shortcuts."
+        score: Math.min(98, Math.max(30, safetyScore + 2)),
+        explanation: `Personal security index is evaluated as ${riskLevel.toUpperCase()} for ${mode} transit to ${destName} at ${timeStr}.`,
+        recommendation: isLateNight ? "Remain on lit main avenues with commercial activity." : "Enjoy travel with standard urban awareness."
       },
       transportation: {
-        score: baseScore + 2,
-        explanation: `Selected mode (${travelMode}) operates with regular schedule and active monitoring.`,
-        recommendation: "Have digital ticket or transit app ready before arriving at stop."
+        score: Math.min(98, Math.max(30, safetyScore + (mode === 'Rideshare' ? 6 : -2))),
+        explanation: `Selected transport mode (${mode}) provides ${mode === 'Rideshare' ? 'direct door-to-door safety' : 'standard transit corridor access'}.`,
+        recommendation: mode === 'Rideshare' ? "Confirm driver credentials before boarding." : "Keep transit pass ready."
       },
       environmental: {
-        score: 96,
-        explanation: "Clear weather conditions forecast with zero severe weather advisories.",
-        recommendation: "Carry appropriate footwear for comfortable urban walking."
+        score: isLateNight ? 82 : 95,
+        explanation: `Street illumination and weather visibility assessed for ${timeTag}.`,
+        recommendation: isLateNight ? "Carry a small flashlight or keep phone torch accessible." : "Comfortable walking shoes recommended."
       },
       crowdLevel: {
-        score: 88,
-        explanation: "Moderate foot traffic active near commercial hubs and transit centers.",
-        recommendation: "Keep personal valuables secure in front pockets or closed bags."
+        score: isLateNight ? 72 : 90,
+        explanation: `Foot traffic density in ${destName} is expected to be ${isLateNight ? 'low' : 'moderate to high'}.`,
+        recommendation: isLateNight ? "Avoid unpopulated streets." : "Keep wallet and phone secure in crowds."
       },
       generalAdvice: {
-        score: baseScore + 1,
-        explanation: "Primary safe corridor monitored by local emergency services.",
+        score: safetyScore,
+        explanation: `Overall corridor safety rating for ${destName} during ${timeTag}.`,
         recommendation: "Enable HALO Live Journey tracking before commencing your trip."
       }
     },
-    recommendations: [
-      "Travel along lit primary thoroughfares.",
-      "Avoid isolated alley shortcuts late at night.",
-      "Keep phone battery charged above 50% before departing.",
-      "Share your live tracking corridor link with trusted contacts."
-    ],
-    recommendedTravelWindow: "08:00 AM - 08:30 PM",
-    thingsToRemember: [
-      "Emergency contacts saved on mobile",
-      "Phone charged above 50%",
-      "Live location sharing enabled",
-      "Offline map corridor cached"
-    ],
-    finalSummary: `Overall, ${destination || 'your destination'} provides a secure travel corridor when exercising standard safety practices.`
+    recommendations,
+    recommendedTravelWindow: isLateNight ? "08:00 AM - 08:30 PM (Daylight window recommended)" : "08:00 AM - 09:30 PM",
+    thingsToRemember,
+    finalSummary: `Overall, travelling to ${destName} via ${mode} at ${timeStr} yields a ${riskLevel} Risk rating (${safetyScore}/100). Follow the personalized recommendations above.`
   };
 }
 
