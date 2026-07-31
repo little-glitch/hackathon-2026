@@ -1,8 +1,280 @@
 /**
- * HALO AI Monitoring & Destination-Specific Safety Analysis Service
+ * HALO AI Monitoring & Dynamic Destination Safety Analysis Service
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+
+/**
+ * Generates an AI-powered smart travel plan using Gemini API
+ */
+export async function generateTravelPlanWithAI({
+  origin = 'Central Station',
+  destination = 'City Center',
+  travelDate = '',
+  departureTime = '',
+  travelMode = 'Walking',
+  travelingAlone = true,
+  additionalNotes = ''
+}) {
+  const cleanOrigin = (origin || 'Origin Point').trim();
+  const cleanDestination = (destination || 'Destination Point').trim();
+
+  console.log('[HALO AI Travel Plan] Inputs received:', {
+    origin: cleanOrigin,
+    destination: cleanDestination,
+    travelDate,
+    departureTime,
+    travelMode,
+    travelingAlone,
+    additionalNotes
+  });
+
+  const prompt = `
+You are HALO, an expert solo travel planning AI assistant.
+Generate a structured, personalized, end-to-end travel plan based on these exact parameters:
+
+- Starting Location: ${cleanOrigin}
+- Destination: ${cleanDestination}
+- Date of Travel: ${travelDate || 'Today'}
+- Departure Time: ${departureTime || 'Current Hour'}
+- Mode of Transport: ${travelMode}
+- Traveling Alone: ${travelingAlone ? 'YES (Solo Traveler)' : 'NO (Group Traveler)'}
+- Additional Notes: ${additionalNotes || 'None'}
+
+CRITICAL INSTRUCTIONS:
+1. Calculate a HALO Journey Readiness Score (0-100) reflecting how safe and prepared this journey is.
+2. Generate a step-by-step Journey Timeline from ${cleanOrigin} to ${cleanDestination}.
+3. Create a dynamic packing checklist tailored to ${travelMode}, ${departureTime}, and solo travel status (${travelingAlone}).
+4. Provide 4 to 6 personalized, practical travel tips (avoid generic advice!).
+
+Respond ONLY in valid JSON matching this schema:
+{
+  "readinessScore": 88,
+  "readinessLevel": "Low" | "Moderate" | "High",
+  "journeyOverview": "Detailed journey overview starting from ${cleanOrigin} to ${cleanDestination}...",
+  "bestDepartureTime": "08:15 AM",
+  "routeStrategy": "Recommended lit primary corridor strategy...",
+  "journeyDistance": "4.2 km",
+  "estimatedDuration": "25 mins",
+  "packingChecklist": [
+    "Fully charged smartphone & power bank",
+    "Water bottle for stay hydrated",
+    "Emergency contacts saved on speed dial",
+    "Weather-appropriate jacket or umbrella",
+    "Physical or digital government ID"
+  ],
+  "journeyTimeline": [
+    {
+      "step": 1,
+      "time": "08:15 AM",
+      "title": "Depart Origin",
+      "action": "Leave ${cleanOrigin} via primary boulevard.",
+      "recommendation": "Check live location sync is active."
+    },
+    {
+      "step": 2,
+      "time": "08:25 AM",
+      "title": "Transit / Mid-point Navigation",
+      "action": "Proceed along main transit corridor via ${travelMode}.",
+      "recommendation": "Stay aware of surroundings and lit thoroughfares."
+    },
+    {
+      "step": 3,
+      "time": "08:40 AM",
+      "title": "Arrive at Destination",
+      "action": "Reach ${cleanDestination} safely.",
+      "recommendation": "Perform HALO arrival check-in."
+    }
+  ],
+  "aiTravelTips": [
+    "Leave 15 minutes early to avoid rush-hour congestion.",
+    "Stick to main lit thoroughfares rather than unmonitored shortcuts.",
+    "Keep mobile battery charged above 50% for continuous tracking.",
+    "Share live journey link with primary emergency contact."
+  ],
+  "recommendedPrecautions": [
+    "Verify local transit schedules before departing.",
+    "Keep emergency contact shortcut pinned on lock screen."
+  ],
+  "finalSummary": "Final overall summary statement for travel from ${cleanOrigin} to ${cleanDestination}."
+}
+`;
+
+  if (GEMINI_API_KEY) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        }
+      );
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (text) {
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+      }
+    } catch (err) {
+      console.warn('[HALO AI Travel Plan] Gemini API failed, using fallback planner:', err);
+    }
+  }
+
+  // Dynamic Fallback Travel Planner Engine
+  return fallbackTravelPlanReasoning({
+    origin: cleanOrigin,
+    destination: cleanDestination,
+    travelDate,
+    departureTime,
+    travelMode,
+    travelingAlone,
+    additionalNotes
+  });
+}
+
+/**
+ * Intelligent Dynamic Fallback Travel Planning Engine
+ */
+function fallbackTravelPlanReasoning({
+  origin,
+  destination,
+  travelDate,
+  departureTime,
+  travelMode,
+  travelingAlone,
+  additionalNotes
+}) {
+  const orig = origin || 'Starting Point';
+  const dest = destination || 'Destination';
+  const mode = travelMode || 'Walking';
+  const timeStr = departureTime || '14:00';
+  const notes = (additionalNotes || '').toLowerCase();
+
+  // Parse departure hour
+  let hour = 14;
+  if (timeStr.includes(':')) {
+    const parts = timeStr.split(':');
+    hour = parseInt(parts[0], 10);
+    if (isNaN(hour)) hour = 14;
+  }
+
+  const isNight = hour >= 21 || hour <= 4;
+  const isEvening = hour >= 18 && hour < 21;
+
+  // Base Score Calculation
+  let baseScore = 92;
+  if (isNight) baseScore -= 18;
+  else if (isEvening) baseScore -= 8;
+
+  if (mode === 'Walking' && isNight) baseScore -= 10;
+  if (mode === 'Rideshare' && isNight) baseScore += 12; // Safety recovery
+  if (travelingAlone) baseScore -= 4;
+
+  const readinessScore = Math.min(98, Math.max(45, baseScore));
+
+  let readinessLevel = 'High';
+  if (readinessScore < 65) readinessLevel = 'Low';
+  else if (readinessScore < 82) readinessLevel = 'Moderate';
+  else readinessLevel = 'High';
+
+  // Packing Checklist Items
+  const packingChecklist = [
+    'Fully charged mobile phone (>50% battery)',
+    'Portable power bank & charging cable',
+    'Emergency contacts saved in HALO Safety Circle',
+    'Government ID & digital payment cards',
+    'Reflective items or small flashlight (for night travel)'
+  ];
+
+  if (notes.includes('rain') || notes.includes('weather')) {
+    packingChecklist.push('Compact umbrella or waterproof jacket');
+  }
+  if (mode === 'Cycling') {
+    packingChecklist.push('Bicycle helmet & front/rear LED lights');
+  }
+
+  // Itinerary Timeline Steps
+  const step1Time = timeStr || '14:00';
+  const step2Time = addMinutesToTimeStr(step1Time, 12);
+  const step3Time = addMinutesToTimeStr(step1Time, 28);
+
+  const journeyTimeline = [
+    {
+      step: 1,
+      time: step1Time,
+      title: `Depart ${orig}`,
+      action: `Begin your journey from ${orig} via ${mode}.`,
+      recommendation: "Ensure HALO live tracking sync is active before stepping out."
+    },
+    {
+      step: 2,
+      time: step2Time,
+      title: `Transit Corridor Navigation`,
+      action: `Proceed along primary lit avenue toward ${dest}.`,
+      recommendation: isNight ? "Remain on commercial thoroughfares with active foot traffic." : "Maintain normal spatial awareness."
+    },
+    {
+      step: 3,
+      time: step3Time,
+      title: `Arrival at ${dest}`,
+      action: `Reach ${dest} safely and complete your trip.`,
+      recommendation: "Complete HALO arrival check-in to notify Safety Circle contacts."
+    }
+  ];
+
+  // Tailored AI Travel Tips
+  const aiTravelTips = [
+    `Depart ${orig} promptly at ${step1Time} to maintain optimal daylight/transit schedule.`,
+    mode === 'Walking' && isNight
+      ? `Avoid unlit secondary alleys; stick strictly to primary avenues when walking to ${dest}.`
+      : `Keep mobile device securely stored and accessible for navigation.`,
+    `Share your live HALO journey link with your primary emergency contact before departure.`,
+    `Keep an emergency rideshare app open as a backup transport option.`
+  ];
+
+  return {
+    readinessScore,
+    readinessLevel,
+    journeyOverview: `Personalized travel plan from ${orig} to ${dest} via ${mode} scheduled for ${timeStr}. Overall readiness index evaluated as ${readinessLevel.toUpperCase()} (${readinessScore}/100).`,
+    bestDepartureTime: step1Time,
+    routeStrategy: `Follow primary lit corridor connecting ${orig} and ${dest} with active pedestrian monitoring.`,
+    journeyDistance: '3.8 km',
+    estimatedDuration: '28 mins',
+    packingChecklist,
+    journeyTimeline,
+    aiTravelTips,
+    recommendedPrecautions: [
+      `Confirm live GPS location permissions are granted.`,
+      `Pin primary emergency contact on speed dial.`
+    ],
+    finalSummary: `Your journey from ${orig} to ${dest} is planned with a ${readinessLevel} Readiness rating (${readinessScore}/100). Review your timeline and packing checklist before departing.`
+  };
+}
+
+/**
+ * Helper to add minutes to HH:MM format
+ */
+function addMinutesToTimeStr(timeStr, minsToAdd) {
+  if (!timeStr.includes(':')) return '14:28';
+  const parts = timeStr.split(':');
+  let hours = parseInt(parts[0], 10) || 14;
+  let mins = parseInt(parts[1], 10) || 0;
+
+  mins += minsToAdd;
+  if (mins >= 60) {
+    hours = (hours + Math.floor(mins / 60)) % 24;
+    mins = mins % 60;
+  }
+
+  const hStr = hours < 10 ? `0${hours}` : `${hours}`;
+  const mStr = mins < 10 ? `0${mins}` : `${mins}`;
+  return `${hStr}:${mStr}`;
+}
 
 /**
  * Analyzes destination safety before travel dynamically using Gemini API
@@ -150,8 +422,6 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
 
   const isLateNight = hour >= 22 || hour <= 4;
   const isEvening = hour >= 19 && hour < 22;
-  const isEarlyMorning = hour >= 5 && hour < 7;
-  const isDaytime = hour >= 7 && hour < 19;
 
   // 1. Known City Risk Profiles (Baseline Safety Score)
   let cityBaseScore = 88;
@@ -197,9 +467,6 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
   } else if (isEvening) {
     timePenalty = -6;
     timeTag = `evening (${timeStr})`;
-  } else if (isEarlyMorning) {
-    timePenalty = -3;
-    timeTag = `early morning (${timeStr})`;
   } else {
     timePenalty = 0;
     timeTag = `daytime (${timeStr})`;
@@ -215,11 +482,11 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
       modeDesc = `walking solo on foot in ${destName} late at night increases street exposure`;
     } else {
       modeAdjustment = +2;
-      modeDesc = `walking on foot in ${destName} during daytime provides high visibility and pedestrian access`;
+      modeDesc = `walking on foot in ${destName} during daylight provides high visibility and pedestrian access`;
     }
   } else if (mode === 'Rideshare') {
     if (isLateNight) {
-      modeAdjustment = +14; // Door-to-door safety recovery at night
+      modeAdjustment = +14;
       modeDesc = `utilizing door-to-door rideshare in ${destName} significantly reduces street exposure late at night`;
     } else {
       modeAdjustment = +4;
@@ -249,21 +516,14 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
     notesAdjustment = -3;
   }
 
-  // Compute Final Clamped Score
   const rawScore = cityBaseScore + timePenalty + modeAdjustment + notesAdjustment;
   const safetyScore = Math.min(99, Math.max(35, rawScore));
 
-  // Determine Risk Level
   let riskLevel = 'Low';
-  if (safetyScore < 65) {
-    riskLevel = 'High';
-  } else if (safetyScore < 82) {
-    riskLevel = 'Moderate';
-  } else {
-    riskLevel = 'Low';
-  }
+  if (safetyScore < 65) riskLevel = 'High';
+  else if (safetyScore < 82) riskLevel = 'Moderate';
+  else riskLevel = 'Low';
 
-  // Generate Destination-Specific Recommendations & Checklist
   const recommendations = [];
   const thingsToRemember = [];
 
@@ -299,7 +559,6 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
     recommendations.push(`Share your live HALO tracking corridor link for ${destName} with emergency contacts.`);
   }
 
-  // Checklist items
   thingsToRemember.push(`Emergency contacts saved for ${destName}`);
   thingsToRemember.push(`Phone battery charged above 50% for ${timeStr} trip`);
   thingsToRemember.push(`HALO Live Location sharing active (${mode} Mode)`);

@@ -1,68 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Compass, 
   MapPin, 
-  Navigation, 
   Calendar, 
   Clock, 
-  Footprints, 
-  Bike, 
-  Car, 
-  Bus, 
-  Train, 
-  ShieldCheck, 
-  Zap, 
-  Sun, 
-  Users, 
-  PhoneCall, 
+  Sparkles, 
   ArrowRight, 
+  Loader2, 
   CheckCircle2, 
-  Sparkles,
-  Sliders,
-  FileText
+  FileText, 
+  ShieldCheck, 
+  Luggage, 
+  Route, 
+  Lightbulb, 
+  History, 
+  UserCheck, 
+  UserX,
+  Navigation
 } from 'lucide-react';
+import { generateTravelPlanWithAI } from '../services/aiService';
 
 export default function TravelPlanner() {
-  // Form State for Interactive UI (Frontend only, no API/AI)
-  const [startLocation, setStartLocation] = useState('Central Station, Downtown');
-  const [destination, setDestination] = useState('Grand Market Square');
-  const [travelDate, setTravelDate] = useState('2026-08-01');
-  const [travelTime, setTravelTime] = useState('09:30');
-  const [transportMode, setTransportMode] = useState('walking');
-  const [preference, setPreference] = useState('safest');
-  const [additionalNotes, setAdditionalNotes] = useState('Prefer well-lit streets and active pedestrian paths.');
+  // Form State (Feature 1)
+  const [formData, setFormData] = useState({
+    origin: 'Piazza Navona, Rome',
+    destination: 'Colosseum, Rome',
+    travelDate: '2026-08-01',
+    departureTime: '19:30',
+    travelMode: 'Walking',
+    travelingAlone: true,
+    additionalNotes: 'Solo evening walk, carrying camera equipment.'
+  });
 
-  const transportModes = [
-    { id: 'walking', name: 'Walking', icon: Footprints },
-    { id: 'bike', name: 'Bike', icon: Bike },
-    { id: 'car', name: 'Car', icon: Car },
-    { id: 'bus', name: 'Bus', icon: Bus },
-    { id: 'train', name: 'Train', icon: Train },
-  ];
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [checkedPacking, setCheckedPacking] = useState({});
+  const [history, setHistory] = useState([]);
 
-  const preferences = [
-    { id: 'fastest', name: 'Fastest Route', desc: 'Direct transit path' },
-    { id: 'safest', name: 'Safest Corridor', desc: 'Maximized safety index' },
-    { id: 'balanced', name: 'Balanced', desc: 'Optimized speed & safety' },
-  ];
+  // Initial Mount Plan Generation
+  useEffect(() => {
+    const runInitialPlan = async () => {
+      setIsGenerating(true);
+      const res = await generateTravelPlanWithAI(formData);
+      setIsGenerating(false);
+      setPlan(res);
+      setHistory([
+        {
+          id: `plan-hist-${Date.now()}`,
+          origin: formData.origin,
+          destination: formData.destination,
+          date: formData.travelDate,
+          score: res.readinessScore,
+          level: res.readinessLevel,
+          planData: res
+        }
+      ]);
+    };
 
-  const travelTips = [
-    {
-      title: 'Travel during daylight whenever possible.',
-      desc: 'Daytime journeys benefit from higher visibility, active public transit, and open emergency hubs.',
-      icon: Sun
-    },
-    {
-      title: 'Share your trip with trusted contacts.',
-      desc: 'Send live itinerary links to emergency contacts so trusted friends stay informed of your path.',
-      icon: Users
-    },
-    {
-      title: 'Keep emergency contacts accessible.',
-      desc: 'Ensure local emergency numbers and HALO 1-click SOS are pinned to your phone quick dial.',
-      icon: PhoneCall
+    runInitialPlan();
+  }, []);
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleTogglePacking = (idx) => {
+    setCheckedPacking(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // Submit Handler (Feature 1)
+  const handleSubmitPlan = async (e) => {
+    e.preventDefault();
+    if (!formData.origin || !formData.destination) return;
+
+    setPlan(null);
+    setIsGenerating(true);
+
+    const res = await generateTravelPlanWithAI({
+      origin: formData.origin.trim(),
+      destination: formData.destination.trim(),
+      travelDate: formData.travelDate,
+      departureTime: formData.departureTime,
+      travelMode: formData.travelMode,
+      travelingAlone: formData.travelingAlone,
+      additionalNotes: formData.additionalNotes
+    });
+
+    setIsGenerating(false);
+    setPlan(res);
+
+    // Feature 8: Log to session planning history (max 5)
+    const historyEntry = {
+      id: `plan-hist-${Date.now()}-${Math.random()}`,
+      origin: formData.origin.trim(),
+      destination: formData.destination.trim(),
+      date: formData.travelDate || 'Today',
+      score: res.readinessScore,
+      level: res.readinessLevel,
+      planData: res
+    };
+
+    setHistory(prev => [historyEntry, ...prev].slice(0, 5));
+  };
+
+  const handleSelectHistoryItem = (item) => {
+    if (item.planData) {
+      setPlan(item.planData);
     }
-  ];
+  };
+
+  // Score Color Helper
+  const getScoreColorClasses = (score) => {
+    if (score >= 80) {
+      return {
+        badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+        text: 'text-emerald-700',
+        barBg: 'bg-emerald-600'
+      };
+    } else if (score >= 60) {
+      return {
+        badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
+        text: 'text-amber-700',
+        barBg: 'bg-amber-600'
+      };
+    } else {
+      return {
+        badgeBg: 'bg-rose-100 text-rose-900 border-rose-300',
+        text: 'text-rose-700',
+        barBg: 'bg-rose-600'
+      };
+    }
+  };
+
+  const scoreConfig = plan ? getScoreColorClasses(plan.readinessScore) : getScoreColorClasses(90);
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-14 sm:gap-20">
@@ -72,403 +146,507 @@ export default function TravelPlanner() {
         <div className="flex flex-col items-start gap-6 text-left max-w-3xl">
           
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-            <span>AI Travel Intelligence</span>
+            <Compass className="w-3.5 h-3.5 text-white" />
+            <span>AI Journey Planning Assistant</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
-            AI Travel Planner
+            Smart Travel Planner
           </h1>
 
           <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
-            Plan a safer journey with AI-assisted route planning, destination insights, and travel recommendations.
+            Create personalized, safe, and intelligent travel itineraries tailored to your schedule, mode of transport, and solo travel preferences.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
-            <a
-              href="#planner-form"
-              className="btn-dark-green w-full sm:w-auto px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2"
-            >
-              <span>Generate Safe Route</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-
-            <a
-              href="#journey-preview"
-              className="w-full sm:w-auto text-xs font-extrabold tracking-widest uppercase text-white/90 hover:text-white border-b-2 border-white/50 hover:border-white pb-1 transition-all text-center"
-            >
-              View Sample Plan
-            </a>
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* SECTION 2: Travel Planning Form */}
-      <section id="planner-form" className="editorial-white-card p-8 sm:p-12 scroll-mt-24">
-        <div className="flex flex-col gap-8">
-          
-          {/* Form Header */}
-          <div className="flex flex-col gap-2 border-b border-black/5 pb-6">
-            <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
-              <Sliders className="w-4 h-4" />
-              <span>Journey Configuration</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#222926] font-heading">
-              Trip Details & Safety Preferences
-            </h2>
-            <p className="text-[#666C68] text-sm font-normal">
-              Specify your origin, destination, schedule, and preferred mode of transit.
-            </p>
-          </div>
-
-          {/* Form Inputs Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            
-            {/* Starting Location */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#1D2B26]" />
-                Starting Location
-              </label>
-              <input
-                type="text"
-                value={startLocation}
-                onChange={(e) => setStartLocation(e.target.value)}
-                placeholder="e.g. Central Station, 5th Ave"
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-black/10 text-sm text-[#222926] font-medium focus:outline-none focus:border-[#1D2B26] focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Destination */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-[#1D2B26]" />
-                Destination
-              </label>
-              <input
-                type="text"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="e.g. Grand Market Square"
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-black/10 text-sm text-[#222926] font-medium focus:outline-none focus:border-[#1D2B26] focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Travel Date */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#1D2B26]" />
-                Travel Date
-              </label>
-              <input
-                type="date"
-                value={travelDate}
-                onChange={(e) => setTravelDate(e.target.value)}
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-black/10 text-sm text-[#222926] font-medium focus:outline-none focus:border-[#1D2B26] focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Travel Time */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#1D2B26]" />
-                Travel Time
-              </label>
-              <input
-                type="time"
-                value={travelTime}
-                onChange={(e) => setTravelTime(e.target.value)}
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-black/10 text-sm text-[#222926] font-medium focus:outline-none focus:border-[#1D2B26] focus:bg-white transition-all"
-              />
-            </div>
-
-          </div>
-
-          {/* Mode of Transport */}
-          <div className="flex flex-col gap-3 pt-2">
-            <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
-              Mode of Transport
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {transportModes.map((mode) => {
-                const Icon = mode.icon;
-                const isSelected = transportMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => setTransportMode(mode.id)}
-                    className={`flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all border ${
-                      isSelected
-                        ? 'bg-[#1D2B26] text-white border-[#1D2B26] shadow-md'
-                        : 'bg-slate-50 text-[#666C68] border-black/5 hover:bg-slate-100 hover:text-[#222926]'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{mode.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Travel Preference */}
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
-              Travel Preference
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {preferences.map((pref) => {
-                const isSelected = preference === pref.id;
-                return (
-                  <button
-                    key={pref.id}
-                    type="button"
-                    onClick={() => setPreference(pref.id)}
-                    className={`flex flex-col items-start p-4 rounded-xl text-left transition-all border ${
-                      isSelected
-                        ? 'bg-slate-100 border-[#1D2B26] text-[#1D2B26] shadow-sm'
-                        : 'bg-slate-50 border-black/5 text-[#666C68] hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#222926] flex items-center gap-2">
-                      <CheckCircle2 className={`w-3.5 h-3.5 ${isSelected ? 'text-[#1D2B26]' : 'text-slate-400'}`} />
-                      {pref.name}
-                    </span>
-                    <span className="text-[11px] text-[#666C68] mt-1 font-normal">
-                      {pref.desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Additional Notes */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#1D2B26]" />
-              Additional Notes
-            </label>
-            <textarea
-              rows={3}
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
-              placeholder="e.g. Prefer well-lit streets, avoiding isolated alleys."
-              className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-black/10 text-sm text-[#222926] font-medium focus:outline-none focus:border-[#1D2B26] focus:bg-white transition-all resize-none"
-            />
-          </div>
-
-          {/* Generate Route Button */}
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById('journey-preview');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="btn-dark-green w-full py-4 text-xs font-extrabold uppercase tracking-widest flex items-center justify-center gap-2 mt-2"
+          <a
+            href="#planner-form"
+            className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 mt-2 shadow-xl"
           >
-            <span>Generate Safe Route</span>
+            <span>Create Travel Plan</span>
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </a>
 
         </div>
       </section>
 
 
-      {/* SECTION 3: Journey Preview */}
-      <section id="journey-preview" className="editorial-white-card p-8 sm:p-12 scroll-mt-24">
-        <div className="flex flex-col gap-8">
-          
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-black/5 pb-6">
-            <div className="flex flex-col gap-1">
+      {/* SECTION 2: Form & Session History Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Form Container (Feature 1) */}
+        <section id="planner-form" className="lg:col-span-2 editorial-white-card p-8 sm:p-10 border border-black/5 shadow-md">
+          <form onSubmit={handleSubmitPlan} className="flex flex-col gap-6">
+            
+            <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
               <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Verified Route Intelligence</span>
+                <Compass className="w-4 h-4 text-[#1D2B26]" />
+                <span>Journey Planning Parameters</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-[#222926] font-heading">
-                Journey Dashboard Preview
+              <h2 className="text-2xl font-bold text-[#222926] font-heading">
+                Smart Journey Setup
               </h2>
             </div>
-            <span className="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-emerald-50 text-[#1D2B26] border border-emerald-200">
-              High Safety Corridor
-            </span>
-          </div>
 
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            
-            <div className="p-6 rounded-2xl bg-slate-50 border border-black/5 flex flex-col gap-1">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#666C68]">
-                Estimated Distance
-              </span>
-              <span className="text-3xl sm:text-4xl font-extrabold text-[#1D2B26] font-heading">
-                14.2 km
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Direct Transit Corridor
-              </span>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 border border-black/5 flex flex-col gap-1">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#666C68]">
-                Estimated Time
-              </span>
-              <span className="text-3xl sm:text-4xl font-extrabold text-[#1D2B26] font-heading">
-                22 mins
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Optimal Traffic Conditions
-              </span>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 border border-black/5 flex flex-col gap-1">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#666C68]">
-                Safety Index Score
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-3xl sm:text-4xl font-extrabold text-[#1D2B26] font-heading">
-                  96 / 100
-                </span>
-                <Zap className="w-5 h-5 text-emerald-600 animate-pulse" />
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Starting Location *
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-[#666C68] absolute left-4 top-3.5" />
+                  <input
+                    type="text"
+                    name="origin"
+                    value={formData.origin}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Hotel / Home Address"
+                    required
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
+                  />
+                </div>
               </div>
-              <span className="text-[11px] text-emerald-700 font-bold">
-                Level 1 Low Risk Rating
-              </span>
-            </div>
 
-          </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Destination *
+                </label>
+                <div className="relative">
+                  <Navigation className="w-4 h-4 text-[#666C68] absolute left-4 top-3.5" />
+                  <input
+                    type="text"
+                    name="destination"
+                    value={formData.destination}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Colosseum, Rome"
+                    required
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
+                  />
+                </div>
+              </div>
 
-          {/* Recommended Route Breakdown */}
-          <div className="flex flex-col gap-4 pt-2">
-            <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#1D2B26]">
-              Recommended Safe Route Steps
-            </h3>
-            
-            <div className="flex flex-col gap-3">
-              <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-black/5 flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Date of Travel
+                </label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-[#666C68] absolute left-4 top-3.5" />
+                  <input
+                    type="date"
+                    name="travelDate"
+                    value={formData.travelDate}
+                    onChange={handleInputChange}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Departure Time
+                </label>
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-[#666C68] absolute left-4 top-3.5" />
+                  <input
+                    type="time"
+                    name="departureTime"
+                    value={formData.departureTime}
+                    onChange={handleInputChange}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Primary Mode of Transport
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {['Walking', 'Transit', 'Rideshare', 'Cycling'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, travelMode: mode }))}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
+                        formData.travelMode === mode
+                          ? 'bg-[#1D2B26] text-white border-[#1D2B26] shadow-sm'
+                          : 'bg-slate-50 text-[#666C68] border-black/10 hover:border-black/30'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Traveling Alone Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-black/10 sm:col-span-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#1D2B26] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    1
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-[#222926] font-heading">{startLocation}</div>
-                    <div className="text-xs text-[#666C68]">Departure Terminal • Well-lit public access</div>
+                  {formData.travelingAlone ? (
+                    <UserCheck className="w-5 h-5 text-emerald-700" />
+                  ) : (
+                    <UserX className="w-5 h-5 text-slate-500" />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#222926]">
+                      Traveling Alone (Solo Traveler)
+                    </span>
+                    <span className="text-[11px] text-[#666C68]">
+                      Enable to receive solo safety precautions and corridor monitoring.
+                    </span>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                  Verified Origin
-                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, travelingAlone: !prev.travelingAlone }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex items-center ${
+                    formData.travelingAlone ? 'bg-emerald-700' : 'bg-slate-300'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    formData.travelingAlone ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-black/5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#1D2B26] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    2
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-[#222926] font-heading">Main Ave Safe Corridor</div>
-                    <div className="text-xs text-[#666C68]">Active pedestrian zone • 3 emergency hubs along path</div>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                  3 Patrol Hubs
-                </span>
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Additional Notes or Preferences
+                </label>
+                <textarea
+                  name="additionalNotes"
+                  rows="2"
+                  value={formData.additionalNotes}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Carrying luggage, prefer well-lit main avenues..."
+                  className="w-full p-3.5 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
+                />
               </div>
 
-              <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-black/5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#1D2B26] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    3
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-[#222926] font-heading">{destination}</div>
-                    <div className="text-xs text-[#666C68]">Arrival Zone • Safe Haven Location</div>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                  Verified Haven
-                </span>
-              </div>
             </div>
-          </div>
 
-          {/* Travel Notes Box */}
-          <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200/60 flex flex-col gap-2">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-              Safety Advisory & Route Notes
-            </span>
-            <p className="text-xs text-[#222926] leading-relaxed font-normal">
-              This route stays strictly within monitored pedestrian corridors with continuous street lighting, high foot traffic, and immediate proximity to 4 emergency response centers. Live GPS deviation alerts will stay active throughout your trip.
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isGenerating}
+              className="btn-dark-green w-full py-4 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 mt-2 shadow-lg"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Generating AI Smart Travel Plan...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-white" />
+                  <span>Generate Smart Plan</span>
+                </>
+              )}
+            </button>
+
+          </form>
+        </section>
+
+        {/* Planning Session History Sidebar (Feature 8) */}
+        <section className="editorial-white-card p-8 flex flex-col gap-6 border border-black/5 shadow-md">
+          <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
+            <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
+              <History className="w-4 h-4 text-[#1D2B26]" />
+              <span>Session Memory</span>
+            </div>
+            <h2 className="text-xl font-bold text-[#222926] font-heading">
+              Planning History
+            </h2>
+            <p className="text-[11px] text-[#666C68]">
+              Previous journey plans generated during this session.
             </p>
           </div>
 
-        </div>
-      </section>
+          <div className="flex flex-col gap-3">
+            {history.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-[#666C68]">
+                No previous plans logged yet.
+              </div>
+            ) : (
+              history.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleSelectHistoryItem(item)}
+                  className="p-4 rounded-xl bg-slate-50 border border-black/5 hover:border-black/20 hover:bg-slate-100/80 transition-all cursor-pointer flex items-center justify-between gap-3"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-[#222926] font-heading truncate max-w-[150px]">
+                      {item.origin} → {item.destination}
+                    </span>
+                    <span className="text-[10px] text-[#666C68]">
+                      Date: {item.date}
+                    </span>
+                  </div>
 
-
-      {/* SECTION 4: Travel Tips */}
-      <section className="flex flex-col gap-8">
-        <div className="flex flex-col gap-2">
-          <div className="inline-flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
-            <Compass className="w-4 h-4 text-[#1D2B26]" />
-            <span>Essential Precautions</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-normal text-[#222926] font-heading tracking-tight">
-            Solo Traveler Safety Recommendations
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {travelTips.map((tip, idx) => {
-            const Icon = tip.icon;
-            return (
-              <div 
-                key={idx}
-                className="editorial-white-card p-8 flex flex-col gap-4"
-              >
-                <div className="w-12 h-12 rounded-xl bg-[#1D2B26] text-white flex items-center justify-center shadow-md">
-                  <Icon className="w-6 h-6" />
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest ${
+                    item.level === 'High' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : item.level === 'Moderate'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {item.score}/100
+                  </span>
                 </div>
-                <h3 className="text-lg font-bold text-[#222926] font-heading leading-snug">
-                  {tip.title}
-                </h3>
-                <p className="text-xs text-[#666C68] leading-relaxed font-normal">
-                  {tip.desc}
+              ))
+            )}
+          </div>
+        </section>
+
+      </div>
+
+
+      {/* Loading Feedback Indicator */}
+      {isGenerating && (
+        <div className="editorial-white-card p-12 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in duration-200">
+          <Loader2 className="w-10 h-10 animate-spin text-[#1D2B26]" />
+          <div className="flex flex-col gap-1">
+            <span className="text-lg font-bold text-[#222926] font-heading">
+              Creating Tailored Travel Plan from "{formData.origin}" to "{formData.destination}"
+            </span>
+            <span className="text-xs text-[#666C68]">
+              Analyzing route strategies, departure windows, packing requirements, and safety tips...
+            </span>
+          </div>
+        </div>
+      )}
+
+
+      {/* AI Generated Plan Output */}
+      {!isGenerating && plan && (
+        <div className="flex flex-col gap-14 animate-in fade-in duration-300">
+          
+          {/* SECTION 3: HALO Journey Score & Strategy (Feature 2 & 3) */}
+          <section className="editorial-white-card p-8 sm:p-12 border border-black/5 shadow-md flex flex-col gap-6">
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-black/5 pb-6">
+              <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
+                <Sparkles className="w-4 h-4 text-[#1D2B26]" />
+                <span>AI Smart Plan Output</span>
+              </div>
+
+              <span className={`px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-widest border ${scoreConfig.badgeBg}`}>
+                {plan.readinessLevel} Readiness
+              </span>
+            </div>
+
+            {/* Score Callout Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+              
+              <div className="p-8 rounded-2xl bg-slate-50 border border-black/5 flex flex-col items-center justify-center text-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#666C68]">
+                  HALO Journey Readiness Score
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-6xl font-extrabold font-heading ${scoreConfig.text}`}>
+                    {plan.readinessScore}
+                  </span>
+                  <span className="text-xl font-bold text-[#666C68]">/100</span>
+                </div>
+
+                {/* Score Bar */}
+                <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
+                  <div 
+                    className={`h-full ${scoreConfig.barBg} transition-all duration-500`}
+                    style={{ width: `${plan.readinessScore}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-2 flex flex-col gap-3">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26]">
+                  Journey Strategy & Overview
+                </span>
+                <p className="text-sm sm:text-base text-[#222926] leading-relaxed font-normal">
+                  "{plan.journeyOverview}"
+                </p>
+                <div className="flex items-center gap-4 text-xs font-bold text-[#666C68] mt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-[#1D2B26]" />
+                    <span>Best Departure: {plan.bestDepartureTime}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Route className="w-4 h-4 text-[#1D2B26]" />
+                    <span>Distance: {plan.journeyDistance}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </section>
+
+
+          {/* SECTION 4: Step-by-Step Journey Timeline (Feature 5) */}
+          <section className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <div className="inline-flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
+                <Route className="w-4 h-4 text-[#1D2B26]" />
+                <span>Step-by-Step Travel Plan</span>
+              </div>
+              <h2 className="text-3xl font-normal text-[#222926] font-heading tracking-tight">
+                Journey Timeline
+              </h2>
+            </div>
+
+            <div className="editorial-white-card p-8 sm:p-10 border border-black/5 shadow-md flex flex-col gap-6">
+              {(plan.journeyTimeline || []).map((stepItem, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-start gap-4 sm:gap-6 pb-6 border-b border-black/5 last:border-b-0 last:pb-0"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-[#1D2B26] text-white flex items-center justify-center text-sm font-extrabold font-heading shrink-0 shadow-sm">
+                    {stepItem.step}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <h3 className="text-base font-bold text-[#222926] font-heading">
+                        {stepItem.title}
+                      </h3>
+                      <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-[#1D2B26] self-start sm:self-auto border border-black/5">
+                        {stepItem.time}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-[#222926] font-medium leading-relaxed">
+                      {stepItem.action}
+                    </p>
+
+                    <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50/80 px-3 py-2 rounded-xl border border-emerald-200/60 mt-1">
+                      Recommendation: {stepItem.recommendation}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+
+          {/* SECTION 5 & 6: AI Travel Tips & Dynamic Packing Checklist (Feature 4 & 6) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* AI Travel Tips (Feature 6) */}
+            <section className="editorial-white-card p-8 sm:p-10 border border-black/5 shadow-md flex flex-col gap-6">
+              <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
+                <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
+                  <Lightbulb className="w-4 h-4 text-[#1D2B26]" />
+                  <span>AI Personalized Recommendations</span>
+                </div>
+                <h2 className="text-2xl font-bold text-[#222926] font-heading">
+                  AI Travel Tips
+                </h2>
+              </div>
+
+              <div className="flex flex-col gap-3.5">
+                {(plan.aiTravelTips || []).map((tipText, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-slate-50 border border-black/5 flex items-start gap-3 text-xs font-medium text-[#222926]">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0 mt-0.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    </div>
+                    <span className="leading-relaxed pt-0.5">{tipText}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Dynamic Packing Checklist (Feature 4) */}
+            <section className="editorial-white-card p-8 sm:p-10 border border-black/5 shadow-md flex flex-col gap-6">
+              <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
+                <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
+                  <Luggage className="w-4 h-4 text-[#1D2B26]" />
+                  <span>Contextual Checklist</span>
+                </div>
+                <h2 className="text-2xl font-bold text-[#222926] font-heading">
+                  Packing Checklist
+                </h2>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {(plan.packingChecklist || []).map((item, idx) => {
+                  const isChecked = !!checkedPacking[idx];
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleTogglePacking(idx)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isChecked
+                          ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                          : 'bg-slate-50 border-black/5 text-[#222926] hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className={`text-xs font-bold ${isChecked ? 'line-through opacity-70' : ''}`}>
+                        {item}
+                      </span>
+
+                      <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                        isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-black/30'
+                      }`}>
+                        {isChecked && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+          </div>
+
+
+          {/* SECTION 7: Journey Summary Report Card (Feature 7) */}
+          <section className="reference-hero-container p-8 sm:p-12 text-white flex flex-col gap-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/20 pb-4">
+              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-white/90">
+                <ShieldCheck className="w-4 h-4 text-white" />
+                <span>Journey Summary Report</span>
+              </div>
+              <span className="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
+                Readiness: {plan.readinessScore}/100
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wider opacity-75 font-semibold">
+                  Distance & Duration
+                </span>
+                <span className="text-xl font-bold font-heading">{plan.journeyDistance} ({plan.estimatedDuration})</span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wider opacity-75 font-semibold">
+                  Best Departure Time
+                </span>
+                <span className="text-xl font-bold font-heading">{plan.bestDepartureTime}</span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wider opacity-75 font-semibold">
+                  Overall Readiness
+                </span>
+                <span className="text-xl font-bold font-heading">{plan.readinessLevel} Readiness</span>
+              </div>
+
+              <div className="flex flex-col gap-1 sm:col-span-3">
+                <span className="text-xs uppercase tracking-wider opacity-75 font-semibold">
+                  Final AI Advisor Summary
+                </span>
+                <p className="text-sm font-light leading-relaxed text-white/90">
+                  {plan.finalSummary}
                 </p>
               </div>
-            );
-          })}
+            </div>
+          </section>
+
         </div>
-      </section>
-
-
-      {/* SECTION 5: Bottom CTA */}
-      <section className="reference-hero-container p-10 sm:p-14 text-center flex flex-col items-center justify-center gap-5">
-        <div className="w-14 h-14 rounded-full bg-white/20 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-md">
-          <ShieldCheck className="w-7 h-7" />
-        </div>
-
-        <h2 className="text-3xl sm:text-5xl font-normal text-white font-heading tracking-tight">
-          Ready to travel safely?
-        </h2>
-
-        <p className="text-white/90 text-sm sm:text-base max-w-lg font-light leading-relaxed">
-          Start your journey with confidence using HALO's proactive safety intelligence and real-time route monitoring.
-        </p>
-
-        <a
-          href="#planner-form"
-          className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 shadow-xl mt-2"
-        >
-          <span>Start Planning</span>
-          <ArrowRight className="w-4 h-4" />
-        </a>
-      </section>
+      )}
 
     </div>
   );
