@@ -36,6 +36,19 @@ export default function AIJourneyMonitor({
   const stationaryStartTimeRef = useRef(null);
   const journeyDurationStartRef = useRef(null);
 
+  // Clear all temporary live state when journey ends or resets to Idle
+  useEffect(() => {
+    if (journeyState === 'Ended' || journeyState === 'Idle') {
+      setAlerts([]);
+      setEvents([]);
+      setRecommendations([]);
+      setCompanionMessage('HALO AI Companion active and monitoring your safe corridor.');
+      setRiskLevel('Low');
+      setConfidence(94);
+      setRiskExplanation('Current journey risk is LOW because you are following the planned route through monitored areas.');
+    }
+  }, [journeyState]);
+
   // Helper to add event to timeline & memory (newest at top)
   const logEvent = (type, description, level = 'Information') => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -280,6 +293,9 @@ export default function AIJourneyMonitor({
       onTriggerEmergencyMode('Stationary Check - User Requested Help');
     }
   };
+
+  // Do not render live monitoring UI components when journey is Ended!
+  if (journeyState === 'Ended') return null;
 
   return (
     <div className="flex flex-col gap-8 w-full">

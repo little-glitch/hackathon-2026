@@ -14,7 +14,8 @@ import {
   Sparkles, 
   Activity, 
   CloudSun, 
-  Clock
+  Clock,
+  RotateCcw
 } from 'lucide-react';
 import JourneyTracker, { calculateHaversineDistance } from '../components/live-journey/JourneyTracker';
 import LiveMap from '../components/live-journey/LiveMap';
@@ -57,7 +58,7 @@ export default function LiveJourney() {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [estimatedTime, setEstimatedTime] = useState(null);
 
-  // End of Journey AI Summary State
+  // End of Journey AI Summary State (Persistent Category 2)
   const [summaryData, setSummaryData] = useState(null);
   const [summaryStats, setSummaryStats] = useState({ observationCount: 0, deviationCount: 0 });
 
@@ -181,10 +182,23 @@ export default function LiveJourney() {
     setSummaryData(aiSummary);
   };
 
-  const handleToggleDemoMode = (enabled) => {
-    setIsDemoMode(enabled);
+  // Reset function to clear all state and start a new journey
+  const handleStartNewJourney = () => {
+    journeyMemory.clear();
+    setSummaryData(null);
+    setEmergencySummaryData(null);
     setJourneyState('Idle');
     setDemoStepIndex(0);
+    setDestination({
+      lat: 41.8902,
+      lng: 12.4922,
+      name: 'Colosseum Safe Hub, Rome'
+    });
+  };
+
+  const handleToggleDemoMode = (enabled) => {
+    setIsDemoMode(enabled);
+    handleStartNewJourney();
     if (enabled) {
       setDestination(DEMO_DESTINATION);
       setRouteCoordinates(DEMO_ROUTE_POINTS);
@@ -192,11 +206,9 @@ export default function LiveJourney() {
   };
 
   const handleRestartDemo = () => {
+    handleStartNewJourney();
     setIsDemoMode(true);
-    setDemoStepIndex(0);
     setJourneyState('Active');
-    setSummaryData(null);
-    setEmergencySummaryData(null);
     setDestination(DEMO_DESTINATION);
     setRouteCoordinates(DEMO_ROUTE_POINTS);
   };
@@ -212,6 +224,8 @@ export default function LiveJourney() {
   // Close Smart Emergency Mode & Generate Report (Path B: End Journey)
   const handleCloseEmergencyMode = async () => {
     setIsEmergencyActive(false);
+    setJourneyState('Ended');
+
     let durationSec = 150;
     if (emergencyStartTime) {
       durationSec = Math.max(5, Math.floor((Date.now() - emergencyStartTime) / 1000));
@@ -237,7 +251,6 @@ export default function LiveJourney() {
     journeyMemory.recordEvent('Emergency Mode Closed', "User selected 'Resume Journey'. Continuing travel corridor.", 'Information');
 
     if (isDemoMode) {
-      // Advance to step 5 (92% progress) to complete journey simulation
       setDemoStepIndex(5);
       setJourneyState('Active');
     }
@@ -251,7 +264,7 @@ export default function LiveJourney() {
   // Resume simulation when user clicks "I'm Fine"
   const handleResumeSimulationFromFine = () => {
     if (isDemoMode) {
-      setDemoStepIndex(5); // Advance from step 4 (stationary) to step 5 (approaching destination)
+      setDemoStepIndex(5);
     }
   };
 
@@ -332,14 +345,25 @@ export default function LiveJourney() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => handleStartJourney(currentLocation)}
-                    className="btn-dark-green w-full sm:w-auto px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2"
-                  >
-                    <span>{isDemoMode ? 'Start Demo Run' : 'Start Journey'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  {journeyState === 'Ended' ? (
+                    <button
+                      type="button"
+                      onClick={handleStartNewJourney}
+                      className="btn-dark-green w-full sm:w-auto px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 shadow-xl"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Start New Journey</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleStartJourney(currentLocation)}
+                      className="btn-dark-green w-full sm:w-auto px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2"
+                    >
+                      <span>{isDemoMode ? 'Start Demo Run' : 'Start Journey'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -355,84 +379,83 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* Post-Emergency Summary Report Card */}
-            {emergencySummaryData && (
-              <section className="w-full">
-                <EmergencySummary
-                  emergencySummaryData={emergencySummaryData}
-                  durationFormatted={emergencyDurationFormatted}
-                  destinationName={destination?.name}
-                  onClose={() => setEmergencySummaryData(null)}
-                />
+            {/* CATEGORY 2: PERSISTENT JOURNEY REPORT CARD (Only shown when Ended) */}
+            {journeyState === 'Ended' && (
+              <section className="w-full flex flex-col gap-6 animate-in fade-in duration-300">
+                {emergencySummaryData ? (
+                  <EmergencySummary
+                    emergencySummaryData={emergencySummaryData}
+                    durationFormatted={emergencyDurationFormatted}
+                    destinationName={destination?.name}
+                    onClose={handleStartNewJourney}
+                  />
+                ) : (
+                  <JourneySummary
+                    destinationName={destination?.name}
+                    summaryData={summaryData}
+                    stats={summaryStats}
+                    onClose={handleStartNewJourney}
+                  />
+                )}
               </section>
             )}
 
 
-            {/* SECTION 2: End-of-Journey AI Summary Report Card (Appears when Ended) */}
-            {journeyState === 'Ended' && !emergencySummaryData && (
-              <section className="w-full">
-                <JourneySummary
-                  destinationName={destination?.name}
-                  summaryData={summaryData}
-                  stats={summaryStats}
-                  onClose={() => setJourneyState('Idle')}
+            {/* CATEGORY 1: TEMPORARY LIVE JOURNEY STATE (Hidden when Ended) */}
+            {journeyState !== 'Ended' && (
+              <>
+                {/* SECTION 2: Journey Controls & Telemetry Status */}
+                <section id="journey-controls" className="flex flex-col gap-8 scroll-mt-24">
+                  
+                  {/* Journey Controls Panel */}
+                  <JourneyControls
+                    journeyState={journeyState}
+                    onStartJourney={() => handleStartJourney(currentLocation)}
+                    onPauseJourney={handlePauseJourney}
+                    onEndJourney={handleEndJourney}
+                    onSetManualDestination={handleSelectDestination}
+                  />
+
+                  {/* Real-time Journey Status Card */}
+                  <JourneyStatusCard
+                    status={journeyState === 'Active' ? 'Active' : (journeyState === 'Paused' ? 'Paused' : 'Ready')}
+                    destinationName={destination ? destination.name : 'Not Selected'}
+                    distanceRemaining={distanceRemaining}
+                    estimatedTime={estimatedTime || (distanceRemaining ? Math.round(distanceRemaining * 3) : null)}
+                    currentSpeed={currentLocation ? currentLocation.speed : 0}
+                    progressPercentage={progressPercentage}
+                  />
+
+                </section>
+
+                {/* SECTION 3: Predictive Safety Intelligence Engine */}
+                <section className="w-full">
+                  <AIJourneyMonitor
+                    journeyState={journeyState}
+                    currentLocation={currentLocation}
+                    destination={destination}
+                    routeCoordinates={routeCoordinates}
+                    distanceRemaining={distanceRemaining}
+                    progressPercentage={progressPercentage}
+                    isDemoMode={isDemoMode}
+                    demoStepIndex={demoStepIndex}
+                    onResumeSimulation={handleResumeSimulationFromFine}
+                    onTriggerEmergencyMode={handleOpenEmergencyMode}
+                  />
+                </section>
+
+                {/* Telemetry Recorder Log Container */}
+                <JourneyRecorder
+                  journeyState={journeyState}
+                  currentLocation={currentLocation}
+                  distanceRemaining={distanceRemaining}
+                  progressPercentage={progressPercentage}
                 />
-              </section>
+              </>
             )}
 
 
-            {/* SECTION 3: Journey Controls & Telemetry Status */}
-            <section id="journey-controls" className="flex flex-col gap-8 scroll-mt-24">
-              
-              {/* Journey Controls Panel */}
-              <JourneyControls
-                journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
-                onStartJourney={() => handleStartJourney(currentLocation)}
-                onPauseJourney={handlePauseJourney}
-                onEndJourney={handleEndJourney}
-                onSetManualDestination={handleSelectDestination}
-              />
-
-              {/* Real-time Journey Status Card */}
-              <JourneyStatusCard
-                status={journeyState === 'Active' ? 'Active' : (journeyState === 'Paused' ? 'Paused' : 'Ready')}
-                destinationName={destination ? destination.name : 'Not Selected'}
-                distanceRemaining={distanceRemaining}
-                estimatedTime={estimatedTime || (distanceRemaining ? Math.round(distanceRemaining * 3) : null)}
-                currentSpeed={currentLocation ? currentLocation.speed : 0}
-                progressPercentage={progressPercentage}
-              />
-
-            </section>
-
-
-            {/* SECTION 4: Predictive Safety Intelligence Engine */}
-            <section className="w-full">
-              <AIJourneyMonitor
-                journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
-                currentLocation={currentLocation}
-                destination={destination}
-                routeCoordinates={routeCoordinates}
-                distanceRemaining={distanceRemaining}
-                progressPercentage={progressPercentage}
-                isDemoMode={isDemoMode}
-                demoStepIndex={demoStepIndex}
-                onResumeSimulation={handleResumeSimulationFromFine}
-                onTriggerEmergencyMode={handleOpenEmergencyMode}
-              />
-            </section>
-
-
-            {/* Telemetry Recorder Log Container */}
-            <JourneyRecorder
-              journeyState={journeyState === 'Ended' ? 'Idle' : journeyState}
-              currentLocation={currentLocation}
-              distanceRemaining={distanceRemaining}
-              progressPercentage={progressPercentage}
-            />
-
-
-            {/* SECTION 5: Interactive Leaflet Map */}
+            {/* SECTION 4: Interactive Leaflet Map */}
             <section className="editorial-white-card p-8 sm:p-12 flex flex-col gap-6">
               <div className="flex flex-col gap-1 border-b border-black/5 pb-6">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
@@ -457,7 +480,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 6: Emergency Quick Actions */}
+            {/* SECTION 5: Emergency Quick Actions */}
             <section id="quick-actions" className="flex flex-col gap-6">
               <div className="flex flex-col gap-2">
                 <div className="inline-flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
@@ -517,7 +540,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 7: Journey Insights */}
+            {/* SECTION 6: Journey Insights */}
             <section className="editorial-white-card p-8 sm:p-12">
               <div className="flex flex-col gap-8">
                 <div className="flex flex-col gap-1 border-b border-black/5 pb-6">
@@ -586,7 +609,7 @@ export default function LiveJourney() {
             </section>
 
 
-            {/* SECTION 8: Bottom CTA */}
+            {/* SECTION 7: Bottom CTA */}
             <section className="reference-hero-container p-10 sm:p-14 text-center flex flex-col items-center justify-center gap-5">
               <div className="w-14 h-14 rounded-full bg-white/20 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-md">
                 <Navigation className="w-7 h-7" />
@@ -600,14 +623,25 @@ export default function LiveJourney() {
                 Start live monitoring and let HALO stay with you every step of the way.
               </p>
 
-              <button
-                type="button"
-                onClick={() => handleStartJourney(currentLocation)}
-                className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 shadow-xl mt-2"
-              >
-                <span>{isDemoMode ? 'Start Demo Run' : 'Start Live Journey'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {journeyState === 'Ended' ? (
+                <button
+                  type="button"
+                  onClick={handleStartNewJourney}
+                  className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 shadow-xl mt-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Start New Journey</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleStartJourney(currentLocation)}
+                  className="btn-dark-green px-8 py-3.5 text-xs font-extrabold tracking-widest uppercase flex items-center gap-2 shadow-xl mt-2"
+                >
+                  <span>{isDemoMode ? 'Start Demo Run' : 'Start Live Journey'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </section>
 
           </div>

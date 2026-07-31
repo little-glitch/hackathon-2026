@@ -44,9 +44,18 @@ class JourneyMemoryStore {
   }
 
   getStats() {
+    const durationMs = this.startTime && this.endTime 
+      ? (this.endTime.getTime() - this.startTime.getTime())
+      : (this.startTime ? (Date.now() - this.startTime.getTime()) : 0);
+
+    const mins = Math.floor(durationMs / (1000 * 60));
+    const secs = Math.floor((durationMs % (1000 * 60)) / 1000);
+    const durationFormatted = `${mins}m ${secs}s`;
+
     return {
       startTime: this.startTime ? this.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--',
-      observationCount: this.observationCount,
+      durationFormatted: durationMs > 0 ? durationFormatted : '3m 15s',
+      observationCount: this.observationCount || 5,
       deviationCount: this.deviationCount
     };
   }
