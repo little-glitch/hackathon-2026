@@ -98,6 +98,140 @@ Respond ONLY in valid JSON matching this schema:
 }
 
 /**
+ * Generates Emergency Situation Analysis & Prioritized Actions using Gemini
+ */
+export async function generateEmergencyAnalysisWithAI({
+  currentLocation,
+  destination,
+  progressPercentage = 0,
+  riskLevel = 'Moderate',
+  isOffRoute = false,
+  isStationary = false,
+  triggerReason = 'SOS Triggered'
+}) {
+  const prompt = `
+You are HALO, an AI emergency travel companion.
+The user activated Emergency Mode (${triggerReason}).
+Location: Lat ${currentLocation?.lat?.toFixed(4)}, Lng ${currentLocation?.lng?.toFixed(4)}
+Destination: ${destination?.name || 'Target Pin'}
+Progress: ${Math.round(progressPercentage)}%
+Risk Level: ${riskLevel}
+Off-Route: ${isOffRoute ? 'YES' : 'NO'}
+Stationary: ${isStationary ? 'YES' : 'NO'}
+
+Generate:
+1. Situation Summary (1-2 sentences)
+2. 4 Prioritized Action Recommendations (Short numbered steps)
+3. Supportive Reassurance Message (Calm, empowering, supportive)
+
+Respond ONLY in valid JSON matching this schema:
+{
+  "situationSummary": "You appear to have stopped unexpectedly while travelling away from the planned route.",
+  "reassuranceText": "Take a deep breath. You are not alone. HALO is actively guiding your next steps.",
+  "recommendedActions": [
+    "Move toward a well-lit, populated area if safe to do so.",
+    "Share your live location with a trusted contact.",
+    "Navigate to the nearest verified safe haven or police hub.",
+    "Remain calm and stay on this screen for guidance."
+  ]
+}
+`;
+
+  if (GEMINI_API_KEY) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        }
+      );
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+      }
+    } catch (err) {
+      console.warn('Gemini emergency analysis failed, using fallback:', err);
+    }
+  }
+
+  // Fallback Emergency Analysis
+  return {
+    situationSummary: isOffRoute
+      ? "You appear to have strayed off your planned safe corridor into an unmonitored zone."
+      : isStationary
+      ? "You appear to have stopped unexpectedly for several minutes along your route."
+      : "Emergency Mode initiated. High priority route guidance and safe haven navigation active.",
+    reassuranceText: "Take a deep breath. You are not alone. HALO is actively guiding your next steps.",
+    recommendedActions: [
+      "Move toward a well-lit, populated area if safe to do so.",
+      "Share your live location with a trusted contact.",
+      "Navigate to the nearest verified safe haven or police hub.",
+      "Remain calm and stay on this screen for guidance."
+    ]
+  };
+}
+
+/**
+ * Generates Post-Emergency Summary Report
+ */
+export async function generateEmergencySummaryWithAI({
+  durationFormatted = '2m 30s',
+  actionsTakenCount = 1,
+  destinationName = 'Destination'
+}) {
+  const prompt = `
+You are HALO AI. Generate a post-emergency session summary.
+Duration: ${durationFormatted}
+Destination: ${destinationName}
+
+Respond ONLY in valid JSON matching this schema:
+{
+  "outcomeHeadline": "Emergency Resolved Safely",
+  "summaryDescription": "User confirmed safety check-in and returned to safe corridor.",
+  "actionsTakenSummary": "Location shared with trusted contacts and safe haven navigation verified.",
+  "futureSafetyAdvice": "Keep emergency contacts pinned for instant 1-click location sharing on future trips."
+}
+`;
+
+  if (GEMINI_API_KEY) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        }
+      );
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+      }
+    } catch (err) {
+      console.warn('Gemini emergency summary failed, using fallback:', err);
+    }
+  }
+
+  return {
+    outcomeHeadline: "Emergency Resolved Safely",
+    summaryDescription: `Emergency session of ${durationFormatted} concluded cleanly. User guided to verified safe status.`,
+    actionsTakenSummary: "Location sync verified and safe haven coordinates confirmed.",
+    futureSafetyAdvice: "Keep emergency quick contacts pinned for instant 1-click sharing on future travel journeys."
+  };
+}
+
+/**
  * Generates final end-of-journey AI Summary Report
  */
 export async function generateJourneySummaryWithAI({

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Navigation, 
   Radio, 
@@ -23,13 +23,22 @@ import JourneyControls from '../components/live-journey/JourneyControls';
 import AIJourneyMonitor from '../components/live-journey/AIJourneyMonitor';
 import JourneyRecorder from '../components/live-journey/JourneyRecorder';
 import JourneySummary from '../components/live-journey/JourneySummary';
+import EmergencyOverlay from '../components/live-journey/EmergencyOverlay';
+import EmergencySummary from '../components/live-journey/EmergencySummary';
 import { journeyMemory } from '../services/JourneyMemory';
-import { generateJourneySummaryWithAI } from '../services/aiService';
+import { generateJourneySummaryWithAI, generateEmergencySummaryWithAI } from '../services/aiService';
 
 export default function LiveJourney() {
   // Journey State: 'Idle' | 'Active' | 'Paused' | 'Ended'
   const [journeyState, setJourneyState] = useState('Idle');
   
+  // Emergency Mode State
+  const [isEmergencyActive, setIsEmergencyActive] = useState(false);
+  const [emergencyReason, setEmergencyReason] = useState('User SOS Triggered');
+  const [emergencyStartTime, setEmergencyStartTime] = useState(null);
+  const [emergencySummaryData, setEmergencySummaryData] = useState(null);
+  const [emergencyDurationFormatted, setEmergencyDurationFormatted] = useState('2m 30s');
+
   // Destination State (Selected via Map Click or Form Input)
   const [destination, setDestination] = useState({
     lat: 41.8902,
@@ -97,6 +106,7 @@ export default function LiveJourney() {
   const handleStartJourney = (currentLocation) => {
     setJourneyState('Active');
     setSummaryData(null);
+    setEmergencySummaryData(null);
     if (currentLocation && destination) {
       const dist = calculateHaversineDistance(
         currentLocation.lat,
@@ -130,6 +140,36 @@ export default function LiveJourney() {
     setSummaryData(aiSummary);
   };
 
+  // Open Smart Emergency Mode
+  const handleOpenEmergencyMode = (reason = 'User SOS Button') => {
+    setEmergencyReason(reason);
+    setEmergencyStartTime(Date.now());
+    setIsEmergencyActive(true);
+    journeyMemory.recordEvent('Emergency Mode Started', `Smart Emergency Mode activated due to: ${reason}`, 'Critical');
+  };
+
+  // Close Smart Emergency Mode & Generate Report
+  const handleCloseEmergencyMode = async () => {
+    setIsEmergencyActive(false);
+    let durationSec = 150;
+    if (emergencyStartTime) {
+      durationSec = Math.max(5, Math.floor((Date.now() - emergencyStartTime) / 1000));
+    }
+    const mins = Math.floor(durationSec / 60);
+    const secs = durationSec % 60;
+    const durationFormatted = `${mins}m ${secs}s`;
+    setEmergencyDurationFormatted(durationFormatted);
+
+    journeyMemory.recordEvent('Emergency Mode Ended', `Emergency session resolved after ${durationFormatted}.`, 'Information');
+
+    const summaryRes = await generateEmergencySummaryWithAI({
+      durationFormatted,
+      destinationName: destination?.name || 'Destination'
+    });
+
+    setEmergencySummaryData(summaryRes);
+  };
+
   const handleSelectDestination = (newDest) => {
     setDestination(newDest);
   };
@@ -160,15 +200,27 @@ export default function LiveJourney() {
         }, [currentLat, currentLng, destination.lat, destination.lng]);
 
         return (
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-14 sm:gap-20">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-14 sm:gap-20 relative">
             
+            {/* Smart Emergency Mode Fullscreen Overlay */}
+            {isEmergencyActive && (
+              <EmergencyOverlay
+                currentLocation={currentLocation}
+                destination={destination}
+                progressPercentage={progressPercentage}
+                riskLevel="High"
+                triggerReason={emergencyReason}
+                onCloseEmergencyMode={handleCloseEmergencyMode}
+              />
+            )}
+
             {/* SECTION 1: Hero Section */}
             <section className="reference-hero-container p-8 sm:p-14 lg:p-16">
               <div className="flex flex-col items-start gap-6 text-left max-w-3xl">
                 
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
                   <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
-                  <span>Predictive AI Route Companion</span>
+                  <span>Proactive AI Route Companion</span>
                 </div>
 
                 <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -176,7 +228,7 @@ export default function LiveJourney() {
                 </h1>
 
                 <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
-                  Monitor your trip in real time and stay informed with proactive predictive safety updates throughout your journey.
+                  Monitor your trip in real time and stay informed with proactive AI safety updates throughout your journey.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
@@ -191,10 +243,11 @@ export default function LiveJourney() {
 
                   <button
                     type="button"
-                    onClick={handlePauseJourney}
-                    className="w-full sm:w-auto text-xs font-extrabold tracking-widest uppercase text-white/90 hover:text-white border-b-2 border-white/50 hover:border-white pb-1 transition-all text-center"
+                    onClick={() => handleOpenEmergencyMode('Hero SOS Trigger')}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold tracking-widest uppercase flex items-center justify-center gap-2 shadow-md transition-all"
                   >
-                    Pause / Resume
+                    <Siren className="w-4 h-4 text-white animate-pulse" />
+                    <span>Emergency SOS</span>
                   </button>
                 </div>
 
@@ -202,8 +255,21 @@ export default function LiveJourney() {
             </section>
 
 
+            {/* Post-Emergency Summary Report Card */}
+            {emergencySummaryData && (
+              <section className="w-full">
+                <EmergencySummary
+                  emergencySummaryData={emergencySummaryData}
+                  durationFormatted={emergencyDurationFormatted}
+                  destinationName={destination?.name}
+                  onClose={() => setEmergencySummaryData(null)}
+                />
+              </section>
+            )}
+
+
             {/* SECTION 2: End-of-Journey AI Summary Report Card (Appears when Ended) */}
-            {journeyState === 'Ended' && (
+            {journeyState === 'Ended' && !emergencySummaryData && (
               <section className="w-full">
                 <JourneySummary
                   destinationName={destination?.name}
@@ -305,6 +371,7 @@ export default function LiveJourney() {
                   return (
                     <div 
                       key={idx}
+                      onClick={() => handleOpenEmergencyMode(action.title)}
                       className={`editorial-white-card p-7 flex flex-col justify-between group hover:shadow-md transition-all cursor-pointer ${
                         action.isAlert ? 'border-rose-200 bg-rose-50/40' : ''
                       }`}
@@ -336,7 +403,7 @@ export default function LiveJourney() {
                       <div className={`pt-4 mt-6 border-t text-xs font-extrabold uppercase tracking-wider flex items-center justify-between ${
                         action.isAlert ? 'border-rose-200 text-rose-700' : 'border-black/5 text-[#1D2B26]'
                       }`}>
-                        <span>Action Shell</span>
+                        <span>Activate Emergency</span>
                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
@@ -421,7 +488,7 @@ export default function LiveJourney() {
                 <Navigation className="w-7 h-7" />
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-normal text-white font-heading tracking-tight">
+              <h2 className="text-3xl sm:text-5xl font-normal text-[#222926] text-white font-heading tracking-tight">
                 Ready to begin your journey?
               </h2>
 
