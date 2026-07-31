@@ -24,7 +24,8 @@ import {
   HeartHandshake,
   Car,
   Briefcase,
-  UserCheck
+  UserCheck,
+  Route
 } from 'lucide-react';
 
 export default function Home() {
