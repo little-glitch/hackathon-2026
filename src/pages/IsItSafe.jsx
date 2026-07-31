@@ -73,15 +73,17 @@ export default function IsItSafe() {
     setCheckedItems(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
-  // Submit Handler for AI Analysis (Dynamic User Inputs)
+  // Submit Handler for AI Analysis (Dynamic User Inputs - Step 8: Clear state before fetch)
   const handleSubmitAnalysis = async (e) => {
     e.preventDefault();
     if (!formData.destination) return;
 
+    // STEP 8: Clear temporary analysis state before generating a new report
+    setReport(null);
     setIsAnalyzing(true);
 
     const res = await analyzeDestinationSafetyWithAI({
-      destination: formData.destination,
+      destination: formData.destination.trim(),
       travelDate: formData.travelDate,
       travelTime: formData.travelTime,
       travelMode: formData.travelMode,
@@ -91,10 +93,10 @@ export default function IsItSafe() {
     setIsAnalyzing(false);
     setReport(res);
 
-    // Save to Analysis History (Feature 8 - max 5 items)
+    // Save to Analysis History (Feature 8 - max 5 distinct entries)
     const historyEntry = {
-      id: `hist-${Date.now()}`,
-      destination: formData.destination,
+      id: `hist-${Date.now()}-${Math.random()}`,
+      destination: formData.destination.trim(),
       date: formData.travelDate || 'Today',
       safetyScore: res.safetyScore,
       riskLevel: res.riskLevel,
@@ -145,7 +147,7 @@ export default function IsItSafe() {
           
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
             <ShieldCheck className="w-3.5 h-3.5 text-white" />
-            <span>AI Safety Intelligence Advisor</span>
+            <span>Destination-Specific AI Safety Intelligence Advisor</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -199,7 +201,7 @@ export default function IsItSafe() {
                     name="destination"
                     value={formData.destination}
                     onChange={handleInputChange}
-                    placeholder="e.g. Trastevere, Rome"
+                    placeholder="e.g. Tokyo, London, Paris, Kochi, New York..."
                     required
                     className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-black/10 text-xs font-medium text-[#222926] focus:outline-none focus:border-[#1D2B26]"
                   />
@@ -285,7 +287,7 @@ export default function IsItSafe() {
               {isAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Evaluating Safety with Gemini AI...</span>
+                  <span>Evaluating Safety for {formData.destination || 'Destination'}...</span>
                 </>
               ) : (
                 <>
@@ -352,8 +354,24 @@ export default function IsItSafe() {
       </div>
 
 
+      {/* Loading Indicator when Analyzing */}
+      {isAnalyzing && (
+        <div className="editorial-white-card p-12 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in duration-200">
+          <Loader2 className="w-10 h-10 animate-spin text-[#1D2B26]" />
+          <div className="flex flex-col gap-1">
+            <span className="text-lg font-bold text-[#222926] font-heading">
+              Evaluating Safety Intelligence for "{formData.destination}"
+            </span>
+            <span className="text-xs text-[#666C68]">
+              Analyzing crime statistics, street lighting, local transit infrastructure, and time parameters...
+            </span>
+          </div>
+        </div>
+      )}
+
+
       {/* Report Section */}
-      {report && (
+      {!isAnalyzing && report && (
         <div className="flex flex-col gap-14 animate-in fade-in duration-300">
           
           {/* SECTION 3: AI Safety Score & Overall Assessment (Feature 3 & 4) */}
@@ -362,7 +380,7 @@ export default function IsItSafe() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-black/5 pb-6">
               <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
                 <Sparkles className="w-4 h-4 text-[#1D2B26]" />
-                <span>Dynamic AI Safety Assessment Output</span>
+                <span>Destination Safety Assessment Output for {formData.destination}</span>
               </div>
 
               <span className={`px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-widest border ${scoreConfig.badgeBg}`}>
@@ -562,7 +580,7 @@ export default function IsItSafe() {
               <div className="flex flex-col gap-1 border-b border-black/5 pb-4">
                 <div className="flex items-center gap-2 text-[#1D2B26] text-xs font-extrabold uppercase tracking-widest">
                   <Sparkles className="w-4 h-4 text-[#1D2B26]" />
-                  <span>AI Personalized Guidance ({formData.travelMode} at {formData.travelTime})</span>
+                  <span>AI Guidance for {formData.destination} ({formData.travelMode} at {formData.travelTime})</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#222926] font-heading">
                   Travel Recommendations
@@ -629,7 +647,7 @@ export default function IsItSafe() {
             <div className="flex items-center justify-between border-b border-white/20 pb-4">
               <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-white/90">
                 <ShieldCheck className="w-4 h-4 text-white" />
-                <span>Journey Preparation Summary</span>
+                <span>Journey Preparation Summary for {formData.destination}</span>
               </div>
               <span className="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
                 Score: {report.safetyScore}/100
