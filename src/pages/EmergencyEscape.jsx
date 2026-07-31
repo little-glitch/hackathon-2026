@@ -29,7 +29,8 @@ import {
   ChevronRight,
   Pill,
   ShieldAlert,
-  Smile
+  Smile,
+  X
 } from 'lucide-react';
 import { journeyMemory } from '../services/JourneyMemory';
 import { generateEmergencyAnalysisWithAI } from '../services/aiService';
@@ -42,7 +43,7 @@ export default function EmergencyEscape() {
   const [aiReport, setAiReport] = useState(null);
   const [actionFeedback, setActionFeedback] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isResolved, setIsResolved] = useState(false);
+  const [showToast, setShowToast] = useState(true);
 
   const emergencyStartTime = journeyContext.emergencyStartTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -52,6 +53,14 @@ export default function EmergencyEscape() {
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareLocationText)}`;
   const smsUrl = `sms:?body=${encodeURIComponent(shareLocationText)}`;
   const telUrl = `tel:${contactPhone}`;
+
+  // 4-Second Auto Dismiss for Reassuring Floating Toast
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowToast(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     async function loadAnalysis() {
@@ -100,8 +109,43 @@ export default function EmergencyEscape() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-10 sm:gap-14">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col gap-10 sm:gap-14 relative">
       
+      {/* REASSURING FLOATING GLASS TOAST (Top-Right, 4s Auto-Dismiss) */}
+      {showToast && (
+        <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-6 duration-500 max-w-sm w-full px-2">
+          <div className="editorial-white-card p-5 border border-emerald-300 bg-white/95 backdrop-blur-xl shadow-2xl rounded-2xl flex items-start gap-4 text-left border-l-4 border-l-emerald-600">
+            <div className="w-10 h-10 rounded-xl bg-[#1D2B26] text-white flex items-center justify-center shrink-0 shadow-md">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+            </div>
+
+            <div className="flex flex-col gap-1 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#1D2B26]">
+                  HALO
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => setShowToast(false)}
+                  className="text-slate-400 hover:text-slate-600 p-0.5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <h4 className="text-sm font-bold text-[#222926] font-heading">
+                Everything is ready.
+              </h4>
+
+              <p className="text-xs text-[#666C68] font-normal leading-relaxed">
+                I'll stay with you while you handle the situation.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* Header Banner */}
       <section className="reference-hero-container p-8 sm:p-12 text-white flex flex-col gap-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/20 pb-4">
