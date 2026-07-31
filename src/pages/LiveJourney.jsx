@@ -31,10 +31,20 @@ import { DEMO_DESTINATION, DEMO_ROUTE_POINTS, DEMO_EVENT_STEPS } from '../servic
 import { journeyMemory } from '../services/JourneyMemory';
 import { generateJourneySummaryWithAI, generateEmergencySummaryWithAI } from '../services/aiService';
 
+import { useLocation } from 'react-router-dom';
+
 export default function LiveJourney() {
+  const location = useLocation();
   // Demo Mode State
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('demo') === 'true') {
+      setIsDemoMode(true);
+    }
+  }, [location.search]);
 
   // Journey State: 'Idle' | 'Active' | 'Paused' | 'Ended'
   const [journeyState, setJourneyState] = useState('Idle');
