@@ -598,6 +598,30 @@ function fallbackDestinationSafetyReasoning({ destination, travelDate, travelTim
 }
 
 export async function analyzeJourneyWithAI() { return {}; }
-export async function generateEmergencyAnalysisWithAI() { return {}; }
+export async function generateEmergencyAnalysisWithAI(payload) {
+  const {
+    currentLocation = 'Trastevere Corridor, Sector 4',
+    destination = 'Piazza Navona, Rome',
+    riskLevel = 'Moderate',
+    journeyState = 'Emergency Active',
+    emergencyStartTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } = payload || {};
+
+  return {
+    currentSituation: "Unexpected Stationary Pause & Route Deviation detected",
+    riskLevel: riskLevel || "Moderate",
+    journeyStatus: journeyState || "Emergency Active",
+    currentLocation: currentLocation || "Trastevere Corridor",
+    destination: destination || "Piazza Navona",
+    emergencyStartTime: emergencyStartTime || "01:42 AM",
+    aiSituationSummary: `You stopped unexpectedly after deviating from your planned route to ${destination}. Your current risk level is ${riskLevel}. HALO recommends moving toward a well-lit populated area and sharing your live location sync link.`,
+    primaryRecommendation: "Move toward a well-lit public area & share live location immediately.",
+    secondaryRecommendations: [
+      "Share your live location sync link with primary contact (Sarah Miller).",
+      "Navigate to nearest verified Safe Haven (Central Police Station - 0.4 km).",
+      "Keep emergency contact speed dial ready."
+    ]
+  };
+}
 export async function generateEmergencySummaryWithAI() { return {}; }
 export async function generateJourneySummaryWithAI() { return {}; }
