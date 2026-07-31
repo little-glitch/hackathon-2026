@@ -14,7 +14,10 @@ import {
   Building, 
   Sparkles, 
   CheckCircle2,
-  Heart
+  Heart,
+  Play,
+  Flame,
+  ArrowRight
 } from 'lucide-react';
 import { generateEmergencyAnalysisWithAI } from '../../services/aiService';
 
@@ -24,7 +27,9 @@ export default function EmergencyOverlay({
   progressPercentage = 0, 
   riskLevel = 'Moderate', 
   triggerReason = 'User Triggered SOS', 
-  onCloseEmergencyMode 
+  onCloseEmergencyMode,
+  onResumeJourneyFromEmergency,
+  onEndJourneyFromEmergency
 }) {
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
@@ -87,14 +92,26 @@ export default function EmergencyOverlay({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onCloseEmergencyMode}
-            className="px-5 py-2.5 rounded-xl bg-[#1D2B26] hover:bg-[#14201C] text-white text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shrink-0"
-          >
-            <XCircle className="w-4 h-4 text-white" />
-            <span>Cancel Emergency Mode</span>
-          </button>
+          {/* Dual Exit Controls: Resume Journey (Path A) vs End Journey (Path B) */}
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={onResumeJourneyFromEmergency || onCloseEmergencyMode}
+              className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md"
+            >
+              <Play className="w-3.5 h-3.5 text-white fill-white" />
+              <span>Resume Journey</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onEndJourneyFromEmergency || onCloseEmergencyMode}
+              className="px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md"
+            >
+              <XCircle className="w-3.5 h-3.5 text-white" />
+              <span>End Journey</span>
+            </button>
+          </div>
         </div>
 
         {/* Telemetry Context Bar */}
@@ -134,6 +151,44 @@ export default function EmergencyOverlay({
           </div>
         </div>
 
+        {/* Feature 3: AI Priority Card */}
+        <div className="p-6 rounded-2xl bg-rose-50 border-2 border-rose-200 flex flex-col gap-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-rose-200 pb-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-rose-600 animate-pulse" />
+              <span className="text-xs font-extrabold uppercase tracking-widest text-rose-950 font-heading">
+                AI Priority Card
+              </span>
+            </div>
+            <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-rose-600 text-white shadow-xs">
+              HIGH PRIORITY
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-800">
+                Current Situation
+              </span>
+              <p className="text-xs font-semibold text-rose-950 leading-relaxed">
+                {isAnalyzing 
+                  ? "Evaluating real-time safety parameters..." 
+                  : (analysis?.situationSummary || "Unexpected stop or distress request during active journey corridor.")}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1 sm:border-l sm:border-rose-200 sm:pl-4">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-800">
+                Recommended First Action
+              </span>
+              <p className="text-xs font-bold text-rose-900 leading-relaxed flex items-start gap-1.5">
+                <ArrowRight className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{analysis?.recommendedActions?.[0] || "Move toward a well-lit, populated area if safe to do so."}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Action Confirmation Banner */}
         {actionNotice && (
           <div className="p-4 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold flex items-center gap-2 border border-emerald-300 animate-in fade-in duration-200">
@@ -156,20 +211,6 @@ export default function EmergencyOverlay({
               "{analysis?.reassuranceText || "Take a deep breath. You're not alone. HALO is actively guiding your next steps."}"
             </p>
           </div>
-        </div>
-
-        {/* Feature 2: AI Situation Analysis */}
-        <div className="p-6 rounded-2xl bg-slate-50 border border-black/5 flex flex-col gap-2">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-[#1D2B26] flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-600" />
-            AI Situation Analysis
-          </span>
-          <p className="text-xs sm:text-sm text-[#222926] leading-relaxed font-normal">
-            {isAnalyzing 
-              ? "Gemini AI is evaluating live journey telemetry and safety parameters..." 
-              : analysis?.situationSummary
-            }
-          </p>
         </div>
 
         {/* Feature 3: Recommended Prioritized Actions */}
@@ -225,11 +266,11 @@ export default function EmergencyOverlay({
 
           <button
             type="button"
-            onClick={onCloseEmergencyMode}
-            className="p-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-md transition-all"
+            onClick={onResumeJourneyFromEmergency || onCloseEmergencyMode}
+            className="p-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-md transition-all"
           >
-            <XCircle className="w-4 h-4 text-white" />
-            <span>Cancel Emergency</span>
+            <Play className="w-4 h-4 text-white fill-white" />
+            <span>Resume Journey</span>
           </button>
         </div>
 

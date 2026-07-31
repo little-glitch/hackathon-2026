@@ -91,7 +91,7 @@ export default function LiveJourney() {
 
   // Deterministic Demo Event Scheduler Loop Effect
   useEffect(() => {
-    if (!isDemoMode || journeyState !== 'Active') return;
+    if (!isDemoMode || journeyState !== 'Active' || isEmergencyActive) return;
 
     setDestination(DEMO_DESTINATION);
     setRouteCoordinates(DEMO_ROUTE_POINTS);
@@ -118,7 +118,7 @@ export default function LiveJourney() {
     }, stepDuration);
 
     return () => clearTimeout(interval);
-  }, [isDemoMode, journeyState, demoStepIndex]);
+  }, [isDemoMode, journeyState, demoStepIndex, isEmergencyActive]);
 
   // Fetch OSRM Route line if available (Normal Mode)
   const fetchRouteLine = async (startLat, startLng, destLat, destLng) => {
@@ -201,7 +201,7 @@ export default function LiveJourney() {
     setRouteCoordinates(DEMO_ROUTE_POINTS);
   };
 
-  // Open Smart Emergency Mode
+  // Open Smart Emergency Mode automatically
   const handleOpenEmergencyMode = (reason = 'User SOS Button') => {
     setEmergencyReason(reason);
     setEmergencyStartTime(Date.now());
@@ -209,7 +209,7 @@ export default function LiveJourney() {
     journeyMemory.recordEvent('Emergency Mode Started', `Smart Emergency Mode activated due to: ${reason}`, 'Critical');
   };
 
-  // Close Smart Emergency Mode & Generate Report
+  // Close Smart Emergency Mode & Generate Report (Path B: End Journey)
   const handleCloseEmergencyMode = async () => {
     setIsEmergencyActive(false);
     let durationSec = 150;
@@ -229,6 +229,30 @@ export default function LiveJourney() {
     });
 
     setEmergencySummaryData(summaryRes);
+  };
+
+  // Path A: Resume Journey from Emergency Overlay
+  const handleResumeJourneyFromEmergency = () => {
+    setIsEmergencyActive(false);
+    journeyMemory.recordEvent('Emergency Mode Closed', "User selected 'Resume Journey'. Continuing travel corridor.", 'Information');
+
+    if (isDemoMode) {
+      // Advance to step 5 (92% progress) to complete journey simulation
+      setDemoStepIndex(5);
+      setJourneyState('Active');
+    }
+  };
+
+  // Path B: End Journey from Emergency Overlay
+  const handleEndJourneyFromEmergency = () => {
+    handleCloseEmergencyMode();
+  };
+
+  // Resume simulation when user clicks "I'm Fine"
+  const handleResumeSimulationFromFine = () => {
+    if (isDemoMode) {
+      setDemoStepIndex(5); // Advance from step 4 (stationary) to step 5 (approaching destination)
+    }
   };
 
   const handleSelectDestination = (newDest) => {
@@ -282,6 +306,8 @@ export default function LiveJourney() {
                 riskLevel="High"
                 triggerReason={emergencyReason}
                 onCloseEmergencyMode={handleCloseEmergencyMode}
+                onResumeJourneyFromEmergency={handleResumeJourneyFromEmergency}
+                onEndJourneyFromEmergency={handleEndJourneyFromEmergency}
               />
             )}
 
@@ -391,6 +417,8 @@ export default function LiveJourney() {
                 progressPercentage={progressPercentage}
                 isDemoMode={isDemoMode}
                 demoStepIndex={demoStepIndex}
+                onResumeSimulation={handleResumeSimulationFromFine}
+                onTriggerEmergencyMode={handleOpenEmergencyMode}
               />
             </section>
 

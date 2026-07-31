@@ -17,7 +17,9 @@ export default function AIJourneyMonitor({
   distanceRemaining = 0, 
   progressPercentage = 0,
   isDemoMode = false,
-  demoStepIndex = 0
+  demoStepIndex = 0,
+  onResumeSimulation,
+  onTriggerEmergencyMode
 }) {
   const [companionMessage, setCompanionMessage] = useState('HALO AI Companion active and monitoring your safe corridor.');
   const [riskLevel, setRiskLevel] = useState('Low');
@@ -256,20 +258,27 @@ export default function AIJourneyMonitor({
     setAlerts(prev => prev.filter(a => a.id !== id));
   };
 
+  // 1. "I'm Fine" handler: dismiss alert, update AI message, and resume simulation!
   const handleConfirmStationaryFine = (id) => {
     setAlerts(prev => prev.filter(a => a.id !== id));
-    logEvent('User Safety Status', "User confirmed: 'I'm Fine' during stationary check.", 'Information');
+    const confirmMsg = "Thanks for confirming. I'll continue monitoring your journey.";
+    setCompanionMessage(confirmMsg);
+    logEvent('User Safety Status', confirmMsg, 'Information');
     stationaryStartTimeRef.current = null;
+
+    if (onResumeSimulation) {
+      onResumeSimulation();
+    }
   };
 
+  // 2. "Need Help" handler: immediately launch Emergency Mode automatically!
   const handleConfirmStationaryHelp = (id) => {
     setAlerts(prev => prev.filter(a => a.id !== id));
-    logEvent('User Safety Status', "User selected: 'Need Help'. Emergency quick actions highlighted.", 'Critical');
-    addAlert({
-      level: 'Critical',
-      title: 'Emergency Assistance Recommended',
-      explanation: 'You indicated that you need help. Access Emergency Quick Actions below to dial SOS or contact trusted supporters.'
-    });
+    logEvent('User Safety Status', "User selected 'Need Help'. Launching Emergency Mode automatically.", 'Critical');
+
+    if (onTriggerEmergencyMode) {
+      onTriggerEmergencyMode('Stationary Check - User Requested Help');
+    }
   };
 
   return (
