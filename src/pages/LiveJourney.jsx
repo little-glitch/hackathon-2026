@@ -26,7 +26,7 @@ import JourneySummary from '../components/live-journey/JourneySummary';
 import EmergencyOverlay from '../components/live-journey/EmergencyOverlay';
 import EmergencySummary from '../components/live-journey/EmergencySummary';
 import DemoToggle from '../components/live-journey/DemoToggle';
-import { DEMO_DESTINATION, DEMO_ROUTE_POINTS, DEMO_STEPS } from '../services/DemoSimulator';
+import { DEMO_DESTINATION, DEMO_ROUTE_POINTS, DEMO_EVENT_STEPS } from '../services/DemoSimulator';
 import { journeyMemory } from '../services/JourneyMemory';
 import { generateJourneySummaryWithAI, generateEmergencySummaryWithAI } from '../services/aiService';
 
@@ -89,27 +89,36 @@ export default function LiveJourney() {
     }
   ];
 
-  // Demo Simulation Loop Effect
+  // Deterministic Demo Event Scheduler Loop Effect
   useEffect(() => {
     if (!isDemoMode || journeyState !== 'Active') return;
 
     setDestination(DEMO_DESTINATION);
     setRouteCoordinates(DEMO_ROUTE_POINTS);
 
-    const interval = setInterval(() => {
+    const currentStep = DEMO_EVENT_STEPS[demoStepIndex];
+
+    // If step is stationary check (step 4 / 75%), pause timer until user interacts
+    if (currentStep && currentStep.isStationaryCheck) {
+      return;
+    }
+
+    // Step duration: 10s after deviation (step 2), 6s for other steps
+    const stepDuration = demoStepIndex === 2 ? 10000 : 6000;
+
+    const interval = setTimeout(() => {
       setDemoStepIndex(prev => {
         const next = prev + 1;
-        if (next >= DEMO_STEPS.length) {
-          clearInterval(interval);
+        if (next >= DEMO_EVENT_STEPS.length) {
           handleEndJourney();
           return prev;
         }
         return next;
       });
-    }, 6000); // 6s per step advance (~1 minute demo run)
+    }, stepDuration);
 
-    return () => clearInterval(interval);
-  }, [isDemoMode, journeyState]);
+    return () => clearTimeout(interval);
+  }, [isDemoMode, journeyState, demoStepIndex]);
 
   // Fetch OSRM Route line if available (Normal Mode)
   const fetchRouteLine = async (startLat, startLng, destLat, destLng) => {
@@ -230,7 +239,7 @@ export default function LiveJourney() {
     <JourneyTracker>
       {({ currentLocation: realLocation, geoError }) => {
         // Active Location depending on Demo Mode vs Normal Mode
-        const currentStepData = isDemoMode ? DEMO_STEPS[demoStepIndex] : null;
+        const currentStepData = isDemoMode ? DEMO_EVENT_STEPS[demoStepIndex] : null;
         
         const currentLocation = isDemoMode && currentStepData
           ? currentStepData.location
@@ -282,7 +291,7 @@ export default function LiveJourney() {
                 
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/20 text-white border border-white/30 backdrop-blur-md">
                   <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
-                  <span>{isDemoMode ? 'Hackathon Simulation Engine' : 'Proactive AI Route Companion'}</span>
+                  <span>{isDemoMode ? 'Event-Driven Demo Scheduler' : 'Proactive AI Route Companion'}</span>
                 </div>
 
                 <h1 className="text-4xl sm:text-6xl font-normal text-white font-heading tracking-tight leading-[1.1]">
@@ -291,7 +300,7 @@ export default function LiveJourney() {
 
                 <p className="text-white/90 text-base sm:text-lg leading-relaxed font-light max-w-2xl">
                   {isDemoMode 
-                    ? "Simulates full live journey tracking, route deviation alerts, risk evaluation & AI companion guidance in 2 minutes."
+                    ? "Event-driven simulation triggering 7 AI events in order: Welcome -> Normal Update -> Route Deviation (Moderate Risk) -> Return to Route (Low Risk) -> Unexpected Stop Check -> Destination Approaching -> Journey Summary."
                     : "Monitor your trip in real time and stay informed with proactive AI safety updates throughout your journey."
                   }
                 </p>
@@ -380,6 +389,8 @@ export default function LiveJourney() {
                 routeCoordinates={routeCoordinates}
                 distanceRemaining={distanceRemaining}
                 progressPercentage={progressPercentage}
+                isDemoMode={isDemoMode}
+                demoStepIndex={demoStepIndex}
               />
             </section>
 

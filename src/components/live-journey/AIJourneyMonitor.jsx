@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { analyzeJourneyWithAI } from '../../services/aiService';
 import { journeyMemory } from '../../services/JourneyMemory';
+import { DEMO_EVENT_STEPS } from '../../services/DemoSimulator';
 import CompanionCard from './CompanionCard';
 import RiskAssessment from './RiskAssessment';
 import RecommendationFeed from './RecommendationFeed';
@@ -14,7 +15,9 @@ export default function AIJourneyMonitor({
   destination, 
   routeCoordinates = [], 
   distanceRemaining = 0, 
-  progressPercentage = 0 
+  progressPercentage = 0,
+  isDemoMode = false,
+  demoStepIndex = 0
 }) {
   const [companionMessage, setCompanionMessage] = useState('HALO AI Companion active and monitoring your safe corridor.');
   const [riskLevel, setRiskLevel] = useState('Low');
@@ -73,7 +76,7 @@ export default function AIJourneyMonitor({
       if (d < minDistanceKm) minDistanceKm = d;
     });
 
-    return minDistanceKm * 1000; // convert to meters
+    return minDistanceKm * 1000;
   };
 
   // Handle session initialization
@@ -81,15 +84,68 @@ export default function AIJourneyMonitor({
     if (journeyState === 'Active') {
       journeyMemory.startSession();
       journeyDurationStartRef.current = Date.now();
-      logEvent('Journey Started', `Live monitoring initialized towards ${destination?.name || 'Target Pin'}.`, 'Information');
+      if (!isDemoMode) {
+        logEvent('Journey Started', `Live monitoring initialized towards ${destination?.name || 'Target Pin'}.`, 'Information');
+      }
     } else if (journeyState === 'Paused') {
       logEvent('Journey Paused', 'Route monitoring paused by user.', 'Information');
     }
-  }, [journeyState]);
+  }, [journeyState, isDemoMode]);
 
-  // Main 20-second AI Monitoring Loop
+  // DEMO MODE EVENT SCHEDULER: Execute exact event payload when demoStepIndex updates
   useEffect(() => {
-    if (journeyState !== 'Active') return;
+    if (!isDemoMode || journeyState !== 'Active') return;
+
+    const stepData = DEMO_EVENT_STEPS[demoStepIndex];
+    if (!stepData) return;
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastUpdated(timestamp);
+
+    // 1. Update Companion Message
+    if (stepData.companionMessage) {
+      setCompanionMessage(stepData.companionMessage);
+    }
+
+    // 2. Update Risk Level & Explanation
+    if (stepData.riskLevel) {
+      setRiskLevel(stepData.riskLevel);
+    }
+    if (stepData.confidence) {
+      setConfidence(stepData.confidence);
+    }
+    if (stepData.riskExplanation) {
+      setRiskExplanation(stepData.riskExplanation);
+    }
+
+    // 3. Log Event to Timeline
+    if (stepData.eventLog) {
+      logEvent(stepData.eventLog.type, stepData.eventLog.description, stepData.eventLog.level);
+    }
+
+    // 4. Trigger Alert if present
+    if (stepData.alert) {
+      addAlert(stepData.alert);
+    }
+
+    // 5. Add Recommendation if present
+    if (stepData.recommendation) {
+      setRecommendations(prev => [
+        {
+          id: `rec-${Date.now()}-${Math.random()}`,
+          timestamp,
+          text: stepData.recommendation.text,
+          priority: stepData.recommendation.priority,
+          confidence: stepData.recommendation.confidence
+        },
+        ...prev
+      ]);
+    }
+  }, [isDemoMode, journeyState, demoStepIndex]);
+
+  // NORMAL MODE: 20-second AI Monitoring Loop
+  useEffect(() => {
+    if (isDemoMode || journeyState !== 'Active') return;
 
     const runAICycle = async () => {
       if (!currentLocation) return;
@@ -102,7 +158,7 @@ export default function AIJourneyMonitor({
 
       // 1. Off-Route Check
       const offRouteDist = calculateOffRouteDistance(currentLocation, routeCoordinates);
-      const isOffRoute = offRouteDist > 150; // >150m deviation threshold
+      const isOffRoute = offRouteDist > 150;
 
       // 2. Stationary Check
       const isLowSpeed = currentLocation.speed < 0.5;
@@ -154,7 +210,6 @@ export default function AIJourneyMonitor({
           setRiskExplanation(aiResult.riskExplanation);
         }
 
-        // Feature 4: Append new predictive recommendations with confidence %
         if (aiResult.recommendations && aiResult.recommendations.length > 0) {
           const newRecs = aiResult.recommendations.map(r => ({
             id: `rec-${Date.now()}-${Math.random()}`,
@@ -164,13 +219,11 @@ export default function AIJourneyMonitor({
             confidence: r.confidence || (aiResult.confidence - 2)
           }));
 
-          setRecommendations(prev => [...newRecs, ...prev].slice(0, 10)); // keep last 10
+          setRecommendations(prev => [...newRecs, ...prev].slice(0, 10));
         }
 
-        // Log AI Check in Timeline & Memory
         logEvent('AI Check Completed', aiResult.companionMessage, aiResult.alertLevel || 'Information');
 
-        // Handle Off-Route Alert
         if (isOffRoute) {
           addAlert({
             level: 'Warning',
@@ -180,7 +233,6 @@ export default function AIJourneyMonitor({
           logEvent('Deviation Detected', `User moved ${Math.round(offRouteDist)}m off planned route corridor.`, 'Warning');
         }
 
-        // Handle Stationary Alert
         if (isStationary) {
           addAlert({
             level: 'Warning',
@@ -193,14 +245,11 @@ export default function AIJourneyMonitor({
       }
     };
 
-    // Run first check immediately
     runAICycle();
-
-    // 20-second interval cycle
     const intervalId = setInterval(runAICycle, 20000);
 
     return () => clearInterval(intervalId);
-  }, [journeyState, currentLocation?.lat, currentLocation?.lng, destination?.name]);
+  }, [isDemoMode, journeyState, currentLocation?.lat, currentLocation?.lng, destination?.name]);
 
   // Handlers for Alert Management
   const handleDismissAlert = (id) => {
