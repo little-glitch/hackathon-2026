@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import GlobalFloatingSOS from './components/GlobalFloatingSOS';
+
 import Home from './pages/Home';
 import TravelPlanner from './pages/TravelPlanner';
 import LiveJourney from './pages/LiveJourney';
@@ -26,9 +28,13 @@ export default function App() {
             <Route path="/is-it-safe" element={<IsItSafe />} />
             <Route path="/safety-circle" element={<SafetyCircle />} />
             <Route path="/emergency" element={<EmergencyEscape />} />
+            <Route path="/emergency-escape" element={<EmergencyEscape />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
+
+        {/* Global Floating SOS Button (Flow 1 Manual Emergency) */}
+        <GlobalFloatingSOS />
 
         {/* Global Footer */}
         <Footer />
